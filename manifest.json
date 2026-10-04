@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.0.4",
+  "suiteVersion": "1.0.5",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -22,7 +22,7 @@
     {
       "id": "deputyTimer",
       "name": "Deputy Timer",
-      "description": "Oznaczenie Z (zastępca) w oryginalnym minutniku NI",
+      "description": "Oznaczenie Z w oryginalnym minutniku NI",
       "version": "1.0.1",
       "file": "addons/deputy-timer.js",
       "defaultEnabled": false

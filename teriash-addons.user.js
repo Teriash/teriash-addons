@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Teriash Addons
 // @namespace    https://margonem.pl/
-// @version      1.0.4
+// @version      1.0.5
 // @description  Panel i loader dodatków Teriash do Margonem
 // @author       Teriash
 // @updateURL    https://raw.githubusercontent.com/Teriash/teriash-addons/main/teriash-addons.user.js
@@ -47,8 +47,41 @@
     getText
   };
 
+  function isGameView() {
+    return !!(
+      page.Engine &&
+      (document.querySelector("#GAME_CANVAS") ||
+       document.querySelector(".game-layer") ||
+       document.querySelector(".interface-layer"))
+    );
+  }
+
+  async function waitForGameView(timeout = 30000) {
+    if (isGameView()) return true;
+
+    return await new Promise(resolve => {
+      const started = Date.now();
+      const timer = setInterval(() => {
+        if (isGameView()) {
+          clearInterval(timer);
+          resolve(true);
+        } else if (Date.now() - started >= timeout) {
+          clearInterval(timer);
+          resolve(false);
+        }
+      }, 250);
+    });
+  }
+
   try {
-    console.info("[Teriash Addons] Start loadera v1.0.4 (RAW/no-cache)");
+    console.info("[Teriash Addons] Start loadera v1.0.5 (RAW/no-cache)");
+
+    if (!(await waitForGameView())) {
+      console.info("[Teriash Addons] To nie jest widok gry — panel nie zostanie uruchomiony.");
+      return;
+    }
+
+    console.info("[Teriash Addons] Wykryto widok gry.");
 
     const manifest = JSON.parse(await getText("manifest.json"));
     const saved = GM_getValue("teriashAddons.enabled", {});
@@ -82,7 +115,7 @@
     script.textContent = `${js}\n//# sourceURL=teriash-addons/core/panel.js`;
     (document.head || document.documentElement).appendChild(script);
 
-    console.info("[Teriash Addons] Panel v1.0.4 załadowany z RAW");
+    console.info("[Teriash Addons] Panel v1.0.5 załadowany z RAW");
   } catch (error) {
     console.error("[Teriash Addons] Nie udało się uruchomić loadera:", error);
   }
