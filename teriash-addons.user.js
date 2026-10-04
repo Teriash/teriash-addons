@@ -1,18 +1,19 @@
 // ==UserScript==
 // @name         Teriash Addons
 // @namespace    https://margonem.pl/
-// @version      1.0.3
+// @version      1.0.4
 // @description  Panel i loader dodatków Teriash do Margonem
 // @author       Teriash
-// @updateURL    https://github.com/Teriash/teriash-addons/raw/refs/heads/main/teriash-addons.user.js
-// @downloadURL  https://github.com/Teriash/teriash-addons/raw/refs/heads/main/teriash-addons.user.js
+// @updateURL    https://raw.githubusercontent.com/Teriash/teriash-addons/main/teriash-addons.user.js
+// @downloadURL  https://raw.githubusercontent.com/Teriash/teriash-addons/main/teriash-addons.user.js
 // @match        https://*.margonem.pl/*
 // @match        https://*.margonem.com/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
+// @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
-// @connect       cdn.jsdelivr.net
+// @connect      raw.githubusercontent.com
 // @run-at       document-body
 // ==/UserScript==
 
@@ -20,23 +21,36 @@
   "use strict";
 
   const page = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
-  const BASE = "https://cdn.jsdelivr.net/gh/Teriash/teriash-addons@main/";
+  const BASE = "https://raw.githubusercontent.com/Teriash/teriash-addons/main/";
   const CACHE = String(Date.now());
-
   const url = path => `${BASE}${path}?v=${CACHE}`;
+
+  function getText(path) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: url(path),
+        headers: { "Cache-Control": "no-cache" },
+        onload: r => {
+          if (r.status >= 200 && r.status < 300) resolve(r.responseText);
+          else reject(new Error(`${path}: HTTP ${r.status}`));
+        },
+        onerror: () => reject(new Error(`${path}: błąd połączenia`))
+      });
+    });
+  }
 
   page.TeriashAddonsBridge = {
     getValue: (key, fallback = null) => GM_getValue(key, fallback),
     setValue: (key, value) => GM_setValue(key, value),
-    deleteValue: key => GM_deleteValue(key)
+    deleteValue: key => GM_deleteValue(key),
+    getText
   };
 
   try {
-    console.info("[Teriash Addons] Start loadera v1.0.3");
-    const response = await fetch(url("manifest.json"));
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const manifest = await response.json();
+    console.info("[Teriash Addons] Start loadera v1.0.4 (RAW/no-cache)");
 
+    const manifest = JSON.parse(await getText("manifest.json"));
     const saved = GM_getValue("teriashAddons.enabled", {});
     const enabled = {};
 
@@ -56,16 +70,19 @@
       url
     };
 
-    const style = document.createElement("link");
-    style.rel = "stylesheet";
-    style.href = url("core/panel.css");
+    const css = await getText("core/panel.css");
+    const style = document.createElement("style");
+    style.id = "ta-core-style";
+    style.textContent = css;
     (document.head || document.documentElement).appendChild(style);
 
+    const js = await getText("core/panel.js");
     const script = document.createElement("script");
-    script.src = url("core/panel.js");
-    script.onload = () => console.info("[Teriash Addons] Panel załadowany");
-    script.onerror = () => console.error("[Teriash Addons] Błąd ładowania core/panel.js", script.src);
+    script.id = "ta-core-script";
+    script.textContent = `${js}\n//# sourceURL=teriash-addons/core/panel.js`;
     (document.head || document.documentElement).appendChild(script);
+
+    console.info("[Teriash Addons] Panel v1.0.4 załadowany z RAW");
   } catch (error) {
     console.error("[Teriash Addons] Nie udało się uruchomić loadera:", error);
   }

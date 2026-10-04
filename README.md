@@ -23,3 +23,7 @@ Legendary Pulse zachowuje dotychczasowe klucze ustawień.
 Player Labels i Deputy Timer zostały dołączone jako moduły w obecnej postaci.
 Dla tych dwóch wyłączenie może wymagać odświeżenia strony, dopóki nie dostaną
 pełnych metod start/stop.
+
+
+## v1.0.4
+Ładowanie plików bez cache bezpośrednio z GitHub RAW przez GM_xmlhttpRequest. Poprawione przeciąganie pointer events oraz przełączanie ustawień Legendary Pulse.

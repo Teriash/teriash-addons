@@ -32,8 +32,33 @@
   function makeDraggable(el, handle, name, suppressClick = false) {
     let drag = null;
 
-    const move = e => {
-      if (!drag) return;
+    handle.addEventListener("pointerdown", e => {
+      if (e.button !== 0) return;
+      if (handle !== el && e.target.closest("button")) return;
+
+      const r = el.getBoundingClientRect();
+      drag = {
+        id: e.pointerId,
+        sx: e.clientX,
+        sy: e.clientY,
+        x: r.left,
+        y: r.top,
+        moved: false
+      };
+
+      el.style.left = `${r.left}px`;
+      el.style.top = `${r.top}px`;
+      el.style.right = "auto";
+      el.style.bottom = "auto";
+
+      try { handle.setPointerCapture(e.pointerId); } catch {}
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, true);
+
+    handle.addEventListener("pointermove", e => {
+      if (!drag || e.pointerId !== drag.id) return;
+
       const dx = e.clientX - drag.sx;
       const dy = e.clientY - drag.sy;
       if (!drag.moved && Math.hypot(dx, dy) < 3) return;
@@ -43,52 +68,52 @@
       const maxY = Math.max(0, innerHeight - el.offsetHeight);
       el.style.left = `${Math.max(0, Math.min(drag.x + dx, maxX))}px`;
       el.style.top = `${Math.max(0, Math.min(drag.y + dy, maxY))}px`;
-      el.style.right = "auto";
-      el.style.bottom = "auto";
-      e.preventDefault();
-      e.stopPropagation();
-    };
 
-    const up = e => {
-      if (!drag) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, true);
+
+    const finish = e => {
+      if (!drag || e.pointerId !== drag.id) return;
       const moved = drag.moved;
+      try { handle.releasePointerCapture(e.pointerId); } catch {}
       drag = null;
-      window.removeEventListener("mousemove", move, true);
-      window.removeEventListener("mouseup", up, true);
+
       if (moved) {
         savePosition(name, el);
         if (suppressClick) {
           el.dataset.taDragged = "1";
-          setTimeout(() => delete el.dataset.taDragged, 100);
+          setTimeout(() => delete el.dataset.taDragged, 250);
         }
       }
+
       e.preventDefault();
-      e.stopPropagation();
+      e.stopImmediatePropagation();
     };
 
-    handle.addEventListener("mousedown", e => {
-      if (e.button !== 0) return;
-      if (handle !== el && e.target.closest("button")) return;
-      const r = el.getBoundingClientRect();
-      drag = { sx: e.clientX, sy: e.clientY, x: r.left, y: r.top, moved: false };
-      window.addEventListener("mousemove", move, true);
-      window.addEventListener("mouseup", up, true);
-      e.preventDefault();
-      e.stopPropagation();
-    }, true);
+    handle.addEventListener("pointerup", finish, true);
+    handle.addEventListener("pointercancel", finish, true);
   }
 
-  function loadAddon(id) {
+  async function loadAddon(id) {
     const addon = addonById(id);
     if (!addon || TA.loaded.has(id) || TA.loading.has(id)) return;
     TA.loading.add(id);
-    const script = document.createElement("script");
-    script.src = TA.url(addon.file);
-    script.async = true;
-    script.dataset.teriashAddon = id;
-    script.onload = () => { TA.loading.delete(id); TA.loaded.add(id); render(); };
-    script.onerror = () => { TA.loading.delete(id); console.error(`[Teriash Addons] Nie udało się wczytać: ${addon.name}`); render(); };
-    document.head.appendChild(script);
+    render();
+    try {
+      const code = await TA.bridge.getText(addon.file);
+      const script = document.createElement("script");
+      script.dataset.teriashAddon = id;
+      script.textContent = `${code}\n//# sourceURL=teriash-addons/${addon.file}`;
+      (document.head || document.documentElement).appendChild(script);
+      TA.loaded.add(id);
+      console.info(`[Teriash Addons] Załadowano ${addon.name} v${addon.version}`);
+    } catch (e) {
+      console.error(`[Teriash Addons] Nie udało się wczytać: ${addon.name}`, e);
+    } finally {
+      TA.loading.delete(id);
+      render();
+    }
   }
 
   function setEnabled(id, enabled) {
@@ -114,12 +139,13 @@
     if (addon.id === "legendaryPulse") {
       const settings = document.getElementById("lp-settings");
       const isOpen = !!settings?.classList.contains("visible");
+      console.info(`[Teriash Addons] Legendary Pulse settings: ${isOpen ? "zamykam" : "otwieram"}`);
       if (isOpen) {
         if (typeof api.closeSettings === "function") api.closeSettings();
         else settings?.classList.remove("visible");
       } else {
-        const open = addon.settingsMethod ? api[addon.settingsMethod] : api.openSettings;
-        if (typeof open === "function") open.call(api);
+        if (typeof api.openSettings === "function") api.openSettings();
+        else settings?.classList.add("visible");
       }
       return;
     }
