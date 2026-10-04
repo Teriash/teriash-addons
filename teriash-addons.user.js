@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Teriash Addons
 // @namespace    https://margonem.pl/
-// @version      1.0.2
+// @version      1.0.3
 // @description  Panel i loader dodatków Teriash do Margonem
 // @author       Teriash
 // @updateURL    https://github.com/Teriash/teriash-addons/raw/refs/heads/main/teriash-addons.user.js
@@ -32,7 +32,7 @@
   };
 
   try {
-    console.info("[Teriash Addons] Start loadera v1.0.2");
+    console.info("[Teriash Addons] Start loadera v1.0.3");
     const response = await fetch(url("manifest.json"));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const manifest = await response.json();

@@ -31,40 +31,51 @@
 
   function makeDraggable(el, handle, name, suppressClick = false) {
     let drag = null;
-    handle.addEventListener("pointerdown", e => {
-      if (e.button !== 0 || e.target.closest("button") && handle !== el) return;
-      const r = el.getBoundingClientRect();
-      drag = { sx: e.clientX, sy: e.clientY, x: r.left, y: r.top, moved: false };
-      handle.setPointerCapture?.(e.pointerId);
-      e.preventDefault();
-    });
-    handle.addEventListener("pointermove", e => {
+
+    const move = e => {
       if (!drag) return;
-      const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
-      if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
-      if (!drag.moved) return;
+      const dx = e.clientX - drag.sx;
+      const dy = e.clientY - drag.sy;
+      if (!drag.moved && Math.hypot(dx, dy) < 3) return;
+      drag.moved = true;
+
       const maxX = Math.max(0, innerWidth - el.offsetWidth);
       const maxY = Math.max(0, innerHeight - el.offsetHeight);
       el.style.left = `${Math.max(0, Math.min(drag.x + dx, maxX))}px`;
       el.style.top = `${Math.max(0, Math.min(drag.y + dy, maxY))}px`;
       el.style.right = "auto";
       el.style.bottom = "auto";
-    });
-    const finish = e => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    const up = e => {
       if (!drag) return;
       const moved = drag.moved;
       drag = null;
+      window.removeEventListener("mousemove", move, true);
+      window.removeEventListener("mouseup", up, true);
       if (moved) {
         savePosition(name, el);
         if (suppressClick) {
           el.dataset.taDragged = "1";
-          setTimeout(() => delete el.dataset.taDragged, 0);
+          setTimeout(() => delete el.dataset.taDragged, 100);
         }
       }
-      handle.releasePointerCapture?.(e.pointerId);
+      e.preventDefault();
+      e.stopPropagation();
     };
-    handle.addEventListener("pointerup", finish);
-    handle.addEventListener("pointercancel", finish);
+
+    handle.addEventListener("mousedown", e => {
+      if (e.button !== 0) return;
+      if (handle !== el && e.target.closest("button")) return;
+      const r = el.getBoundingClientRect();
+      drag = { sx: e.clientX, sy: e.clientY, x: r.left, y: r.top, moved: false };
+      window.addEventListener("mousemove", move, true);
+      window.addEventListener("mouseup", up, true);
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
   }
 
   function loadAddon(id) {
@@ -99,17 +110,30 @@
   function toggleSettings(addon) {
     const api = addon.settingsGlobal ? window[addon.settingsGlobal] : null;
     if (!api) return;
-    const panel = addon.id === "legendaryPulse" ? document.getElementById("lp-settings") : null;
-    const visible = panel ? panel.classList.contains("visible") : TA.openSettingsId === addon.id;
-    if (visible && typeof api.closeSettings === "function") {
+
+    if (addon.id === "legendaryPulse") {
+      const settings = document.getElementById("lp-settings");
+      const isOpen = !!settings?.classList.contains("visible");
+      if (isOpen) {
+        if (typeof api.closeSettings === "function") api.closeSettings();
+        else settings?.classList.remove("visible");
+      } else {
+        const open = addon.settingsMethod ? api[addon.settingsMethod] : api.openSettings;
+        if (typeof open === "function") open.call(api);
+      }
+      return;
+    }
+
+    const isOpen = TA.openSettingsId === addon.id;
+    if (isOpen && typeof api.closeSettings === "function") {
       api.closeSettings();
       TA.openSettingsId = null;
-    } else {
-      const fn = addon.settingsMethod ? api[addon.settingsMethod] : null;
-      if (typeof fn === "function") {
-        fn.call(api);
-        TA.openSettingsId = addon.id;
-      }
+      return;
+    }
+    const open = addon.settingsMethod ? api[addon.settingsMethod] : api.openSettings;
+    if (typeof open === "function") {
+      open.call(api);
+      TA.openSettingsId = addon.id;
     }
   }
 
@@ -119,7 +143,9 @@
       launcher.id = "ta-launcher";
       launcher.textContent = "TA";
       launcher.title = "Teriash Addons — przeciągnij, aby przenieść";
-      launcher.addEventListener("click", () => {
+      launcher.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
         if (launcher.dataset.taDragged) return;
         document.getElementById("ta-panel")?.classList.toggle("ta-open");
       });
@@ -138,7 +164,7 @@
         </div>
         <div class="ta-body"></div>
         <div class="ta-note">Wyłączenie dodatku, który nie obsługuje zatrzymania na żywo, zacznie obowiązywać po odświeżeniu gry.</div>`;
-      panel.querySelector(".ta-close").addEventListener("click", () => panel.classList.remove("ta-open"));
+      panel.querySelector(".ta-close").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); panel.classList.remove("ta-open"); });
       document.body.appendChild(panel);
       restorePosition("panel", panel);
       makeDraggable(panel, panel.querySelector(".ta-head"), "panel");
@@ -157,8 +183,8 @@
       row.innerHTML = `<div><div class="ta-name">${addon.name}<span class="ta-ver">v${addon.version}</span></div><div class="ta-desc">${addon.description}</div></div>
         <div class="ta-actions"><button class="ta-settings" type="button" title="Otwórz / zamknij ustawienia" ${addon.settingsGlobal && loaded ? "" : "disabled"}>⚙</button>
         <button class="ta-toggle ${enabled ? "on" : ""}" type="button">${loading ? "..." : enabled ? "ON" : "OFF"}</button></div>`;
-      row.querySelector(".ta-toggle").addEventListener("click", () => setEnabled(addon.id, !enabled));
-      row.querySelector(".ta-settings").addEventListener("click", () => toggleSettings(addon));
+      row.querySelector(".ta-toggle").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); setEnabled(addon.id, !enabled); });
+      row.querySelector(".ta-settings").addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); toggleSettings(addon); });
       body.appendChild(row);
     }
   }
