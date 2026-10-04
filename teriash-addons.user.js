@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Teriash Addons
 // @namespace    https://margonem.pl/
-// @version      1.1.7
+// @version      1.1.8
 // @description  Panel i loader dodatków Teriash do Margonem
 // @author       Teriash
 // @updateURL    https://raw.githubusercontent.com/Teriash/teriash-addons/main/teriash-addons.user.js
@@ -74,7 +74,7 @@
   }
 
   try {
-    console.info("[Teriash Addons] Start loadera v1.1.7 (RAW/no-cache)");
+    console.info("[Teriash Addons] Start loadera v1.1.8 (RAW/no-cache)");
 
     if (!(await waitForGameView())) {
       console.info("[Teriash Addons] To nie jest widok gry — panel nie zostanie uruchomiony.");

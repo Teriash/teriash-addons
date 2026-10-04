@@ -331,6 +331,14 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     settingsBox.style.display = "block";
   }
 
+  const clanList = box.querySelector(".taco-list");
+  clanList.addEventListener("wheel", e => {
+    if (!e.deltaY) return;
+    clanList.scrollTop += e.deltaY;
+    e.preventDefault();
+    e.stopPropagation();
+  }, { passive: false });
+
   settingsBox.addEventListener("change", e => {
     const input = e.target.closest("input[data-key]");
     if (!input) return;

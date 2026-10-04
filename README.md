@@ -64,3 +64,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 ## v1.1.7
 - Klanowicze Online: jeszcze mniejsze odstępy między outfitem, nickiem, poziomem i lokalizacją.
 - Paski przewijania są ciemne i dopasowane do stylistyki okna.
+
+## v1.1.8
+- Klanowicze Online: listę można przewijać kółkiem myszy po najechaniu na okno.
+- Scroll jest przechwytywany przez listę, więc nie powinien przewijać/zoomować elementów gry pod oknem.
