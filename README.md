@@ -31,3 +31,7 @@ pełnych metod start/stop.
 
 ## v1.0.5
 Panel Teriash Addons uruchamia się wyłącznie po wykryciu właściwego widoku gry Margonem. Na stronie głównej, logowaniu i innych stronach portalu przycisk TA nie jest tworzony.
+
+
+## v1.1.0
+Dodano moduł **Klanowicze Online**. Pokazuje osoby online na podstawie `Engine.clan.getMemberList()`, wraz z nickiem, poziomem, profesją, outfitem i lokalizacją. W ustawieniach można osobno wyłączyć outfit oraz mapę i koordynaty.
