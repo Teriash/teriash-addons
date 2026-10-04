@@ -85,3 +85,8 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Klanowicze Online: dodano sortowanie listy.
 - Dostępne tryby: nazwa A-Z, nazwa Z-A, level rosnąco i level malejąco.
 - Wybrany sposób sortowania jest zapamiętywany.
+
+## v1.2.2
+- Naprawiono niewidoczną opcję sortowania w ustawieniach Klanowicze Online.
+- Panel ustawień dopasowuje wysokość do zawartości.
+- Na mniejszych ekranach panel ustawień można przewijać.

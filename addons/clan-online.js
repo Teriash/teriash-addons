@@ -61,13 +61,17 @@ background:#262c36;border-bottom:1px solid #444;cursor:move;user-select:none;tou
 #ta-clan-online .taco-loc{font-size:11px;line-height:1.15;overflow:hidden}
 #ta-clan-online .taco-map{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ta-clan-online .taco-empty{padding:18px;text-align:center;opacity:.7}
-#ta-clan-settings{position:fixed;z-index:46;width:290px;background:#171a20;border:1px solid #596171;
+#ta-clan-settings{position:fixed;z-index:46;width:310px;max-height:calc(100vh - 16px);overflow-y:auto;background:#171a20;border:1px solid #596171;
 border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0009;overflow:hidden}
 #ta-clan-settings .tacs-head{padding:10px 12px;font-weight:700;background:#262c36;border-bottom:1px solid #444}
 #ta-clan-settings label{display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid #292e36;cursor:pointer}
 #ta-clan-settings .tacs-sort{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #292e36}
 #ta-clan-settings .tacs-sort span{flex:1}
 #ta-clan-settings select{background:#262c36;color:#eee;border:1px solid #596171;border-radius:4px;padding:4px 6px;outline:none}
+#ta-clan-settings{scrollbar-width:thin;scrollbar-color:#596171 #1b1f26}
+#ta-clan-settings::-webkit-scrollbar{width:8px}
+#ta-clan-settings::-webkit-scrollbar-track{background:#1b1f26}
+#ta-clan-settings::-webkit-scrollbar-thumb{background:#596171;border:2px solid #1b1f26;border-radius:6px}
 #ta-clan-settings .tacs-note{padding:9px 12px;opacity:.65;font-size:11px}
 `;
 
@@ -395,8 +399,8 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
 
     syncSettings();
     const r = box.getBoundingClientRect();
-    settingsBox.style.left = `${Math.max(0, Math.min(r.right + 8, innerWidth - 300))}px`;
-    settingsBox.style.top = `${Math.max(0, Math.min(r.top, innerHeight - 180))}px`;
+    settingsBox.style.left = `${Math.max(8, Math.min(r.right + 8, innerWidth - 318))}px`;
+    settingsBox.style.top = `${Math.max(8, Math.min(r.top, innerHeight - 260))}px`;
     settingsBox.style.display = "block";
   }
 
