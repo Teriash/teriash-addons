@@ -1,0 +1,9 @@
+#ta-launcher{position:fixed;right:18px;bottom:82px;z-index:2147483000;width:40px;height:40px;border:1px solid #6f5cff;border-radius:10px;background:#11131a;color:#fff;font:700 13px Arial;cursor:pointer;box-shadow:0 5px 18px #0008}
+#ta-panel{position:fixed;right:22px;top:70px;z-index:2147483001;width:330px;background:#101219;color:#eceef5;border:1px solid #ffffff20;border-radius:12px;box-shadow:0 18px 55px #000a;font:12px Arial;display:none;overflow:hidden}
+#ta-panel.ta-open{display:block}
+.ta-head{padding:12px 13px;background:linear-gradient(120deg,#201b43,#151725);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ffffff14}
+.ta-title{font-weight:800;font-size:14px}.ta-sub{font-size:9px;color:#ffffff70;margin-top:2px}.ta-close{border:0;background:#ffffff12;color:#fff;border-radius:7px;width:26px;height:26px;cursor:pointer}
+.ta-body{padding:8px}.ta-addon{display:grid;grid-template-columns:1fr auto;gap:7px 10px;padding:10px 7px;border-bottom:1px solid #ffffff0f}.ta-addon:last-child{border-bottom:0}
+.ta-name{font-weight:700}.ta-desc{font-size:10px;color:#ffffff80;margin-top:3px}.ta-ver{font-size:9px;color:#ffffff55;margin-left:5px}.ta-actions{display:flex;align-items:center;gap:6px}
+.ta-toggle,.ta-settings{border:1px solid #ffffff18;border-radius:7px;color:#fff;background:#1b1e28;cursor:pointer;height:27px}.ta-toggle{min-width:48px;font-weight:700}.ta-toggle.on{background:#315f45;border-color:#5ca87b}.ta-settings{width:30px}.ta-settings:disabled{opacity:.35;cursor:default}
+.ta-note{padding:9px 10px 11px;color:#ffffff70;font-size:9px;line-height:1.35;border-top:1px solid #ffffff10}
