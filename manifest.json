@@ -1,0 +1,31 @@
+{
+  "suiteVersion": "1.0.0",
+  "addons": [
+    {
+      "id": "legendaryPulse",
+      "name": "Legendary Pulse",
+      "description": "Notyfikator legend",
+      "version": "1.11.2",
+      "file": "addons/legendary-pulse.js",
+      "defaultEnabled": true,
+      "settingsGlobal": "LegendaryPulse",
+      "settingsMethod": "openSettings"
+    },
+    {
+      "id": "playerLabels",
+      "name": "Player Labels",
+      "description": "Nick, poziom, profesja i klan nad graczem",
+      "version": "1.0.9",
+      "file": "addons/player-labels.js",
+      "defaultEnabled": false
+    },
+    {
+      "id": "deputyTimer",
+      "name": "Deputy Timer",
+      "description": "Oznaczenie Z w oryginalnym minutniku NI",
+      "version": "1.0.1",
+      "file": "addons/deputy-timer.js",
+      "defaultEnabled": false
+    }
+  ]
+}
