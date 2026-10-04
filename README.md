@@ -39,3 +39,8 @@ Dodano moduł **Klanowicze Online**. Pokazuje osoby online na podstawie `Engine.
 
 ## v1.1.1
 Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, więc nie wymaga ręcznego otwierania okna Klany. Outfit jest rozwiązywany przez `Engine.interface.getUrl()` zamiast bezpośredniej ścieżki z danych członka.
+
+
+## v1.1.3
+- Klanowicze Online: poprawione wyświetlanie outfitów jako sprite 32 px.
+- Outfit jest kadrowany do górnych 24 px pierwszej klatki 32x48 (od pasa w górę).

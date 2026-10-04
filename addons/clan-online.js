@@ -41,7 +41,7 @@ background:#262c36;border-bottom:1px solid #444;cursor:move;user-select:none;tou
 #ta-clan-online .taco-list{max-height:400px;overflow:auto}
 #ta-clan-online .taco-row{display:grid;align-items:center;gap:7px;padding:6px 9px;border-bottom:1px solid #2d323b}
 #ta-clan-online .taco-row:last-child{border-bottom:0}
-#ta-clan-online .taco-outfit{width:32px;height:40px;object-fit:contain;object-position:center}
+#ta-clan-online .taco-outfit{width:32px;height:24px;background-repeat:no-repeat;background-position:0 0;flex:none;overflow:hidden}
 #ta-clan-online .taco-nick{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ta-clan-online .taco-lvl{opacity:.9;white-space:nowrap}
 #ta-clan-online .taco-loc{font-size:11px;line-height:1.3;overflow:hidden}
@@ -217,26 +217,28 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   function outfitSrc(path) {
     if (!path) return "";
 
-    // Najpierw resolver klienta NI.
-    const resolver = page.Engine?.interface?.getUrl;
-    if (typeof resolver === "function") {
-      const variants = [
-        () => resolver.call(page.Engine.interface, path),
-        () => resolver.call(page.Engine.interface, path, "char"),
-        () => resolver.call(page.Engine.interface, path, "other")
-      ];
-      for (const fn of variants) {
-        try {
-          const v = fn();
-          if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
-        } catch {}
-      }
+    const raw = String(path).trim();
+
+    // Outfit z pakietu "members" jest ścieżką sprite'a postaci, np.
+    // /paid/bf25-uniwersalne-k.gif. Nie używamy <img>, bo przeglądarka
+    // pomniejszyłaby cały arkusz klatek. Tło 32x24 wycina górną połowę
+    // pierwszej klatki 32x48 (postać od pasa w górę).
+    if (/^(?:\/)?(?:paid|kuf|eve|clan|premium|event|npc)\//i.test(raw)) {
+      return `https://micc.garmory-cdn.cloud/obrazki/postacie/${raw.startsWith("/") ? raw : "/" + raw}`;
     }
 
-    // Ścieżki z pakietu members wskazują grafikę postaci.
-    const clean = String(path).replace(/^\/+/, "");
-    if (clean) return `https://micc.garmory-cdn.cloud/obrazki/postacie/${clean}`;
-    return "";
+    if (/^https?:\/\//i.test(raw)) return raw;
+
+    // Awaryjnie korzystamy z resolvera klienta NI.
+    const resolver = page.Engine?.interface?.getUrl;
+    if (typeof resolver === "function") {
+      try {
+        const v = resolver.call(page.Engine.interface, raw);
+        if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
+      } catch {}
+    }
+
+    return `https://micc.garmory-cdn.cloud/obrazki/postacie/${raw.startsWith("/") ? raw : "/" + raw}`;
   }
 
   function render(message = "") {
@@ -270,7 +272,7 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
         <div class="taco-row" data-id="${esc(m.id)}" style="grid-template-columns:${cols}">
           ${settings.showOutfit
             ? (src
-              ? `<img class="taco-outfit" src="${esc(src)}" alt="" onerror="this.style.visibility='hidden'">`
+              ? `<div class="taco-outfit" style="background-image:url('${esc(src)}')" title="${esc(m.nick)}"></div>`
               : `<div class="taco-outfit"></div>`)
             : ""}
           <div class="taco-nick" title="${esc(m.nick)}">${esc(m.nick)}</div>
