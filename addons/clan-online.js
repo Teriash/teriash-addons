@@ -10,7 +10,7 @@
   const bridge = page.TeriashAddonsBridge || {};
   const getValue = bridge.getValue || ((k, d) => d);
   const setValue = bridge.setValue || (() => {});
-  const defaults = { showOutfit: true, showExactLocation: true, showMapOnly: false };
+  const defaults = { showOutfit: true, showExactLocation: true, showMapOnly: false, sortBy: "nameAsc" };
 
   const storedSettings = getValue(STORAGE, {}) || {};
   let settings = { ...defaults, ...storedSettings };
@@ -65,6 +65,9 @@ background:#262c36;border-bottom:1px solid #444;cursor:move;user-select:none;tou
 border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0009;overflow:hidden}
 #ta-clan-settings .tacs-head{padding:10px 12px;font-weight:700;background:#262c36;border-bottom:1px solid #444}
 #ta-clan-settings label{display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid #292e36;cursor:pointer}
+#ta-clan-settings .tacs-sort{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #292e36}
+#ta-clan-settings .tacs-sort span{flex:1}
+#ta-clan-settings select{background:#262c36;color:#eee;border:1px solid #596171;border-radius:4px;padding:4px 6px;outline:none}
 #ta-clan-settings .tacs-note{padding:9px 12px;opacity:.65;font-size:11px}
 `;
 
@@ -104,7 +107,16 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     <div class="tacs-head">Klanowicze Online — ustawienia</div>
     <label><input type="checkbox" data-key="showOutfit"> Pokazuj aktualny outfit</label>
     <label><input type="checkbox" data-key="showExactLocation"> Pokazuj dokładną pozycję (mapa i X,Y)</label>
-    <label><input type="checkbox" data-key="showMapOnly"> Pokazuj tylko mapę</label>`;
+    <label><input type="checkbox" data-key="showMapOnly"> Pokazuj tylko mapę</label>
+    <div class="tacs-sort">
+      <span>Sortowanie</span>
+      <select data-key="sortBy">
+        <option value="nameAsc">Nazwa A-Z</option>
+        <option value="nameDesc">Nazwa Z-A</option>
+        <option value="levelAsc">Level rosnąco</option>
+        <option value="levelDesc">Level malejąco</option>
+      </select>
+    </div>`;
   document.body.appendChild(settingsBox);
 
   function esc(v) {
@@ -266,9 +278,25 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   }
 
   function onlineMembers() {
-    return clanData
-      .filter(m => Number(m.offlineTime) <= 0)
-      .sort((a, b) => String(a.nick).localeCompare(String(b.nick), "pl"));
+    const arr = clanData.filter(m => Number(m.offlineTime) <= 0);
+
+    switch (settings.sortBy) {
+      case "nameDesc":
+        return arr.sort((a, b) => String(b.nick).localeCompare(String(a.nick), "pl", { sensitivity: "base" }));
+      case "levelAsc":
+        return arr.sort((a, b) =>
+          Number(a.lvl) - Number(b.lvl) ||
+          String(a.nick).localeCompare(String(b.nick), "pl", { sensitivity: "base" })
+        );
+      case "levelDesc":
+        return arr.sort((a, b) =>
+          Number(b.lvl) - Number(a.lvl) ||
+          String(a.nick).localeCompare(String(b.nick), "pl", { sensitivity: "base" })
+        );
+      case "nameAsc":
+      default:
+        return arr.sort((a, b) => String(a.nick).localeCompare(String(b.nick), "pl", { sensitivity: "base" }));
+    }
   }
 
   function outfitSrc(path) {
@@ -352,6 +380,8 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     settingsBox.querySelectorAll("input[data-key]").forEach(i => {
       i.checked = !!settings[i.dataset.key];
     });
+    const sortSelect = settingsBox.querySelector('select[data-key="sortBy"]');
+    if (sortSelect) sortSelect.value = settings.sortBy || "nameAsc";
   }
 
   function toggleSettings(force) {
@@ -391,6 +421,12 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     }
 
     syncSettings();
+    setValue(STORAGE, settings);
+    render();
+  });
+
+  settingsBox.querySelector('select[data-key="sortBy"]').addEventListener("change", e => {
+    settings.sortBy = e.target.value;
     setValue(STORAGE, settings);
     render();
   });

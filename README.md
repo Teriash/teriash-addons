@@ -80,3 +80,8 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Dodano blokadę jednego aktywnego zapytania `clan&a=members` naraz.
 - Podczas przelogowania dodatek czeka na gotowy obiekt bohatera i komunikacji.
 - Automatyczne pobieranie listy jest ograniczone do jednego zapytania na 10 sekund.
+
+## v1.2.1
+- Klanowicze Online: dodano sortowanie listy.
+- Dostępne tryby: nazwa A-Z, nazwa Z-A, level rosnąco i level malejąco.
+- Wybrany sposób sortowania jest zapamiętywany.
