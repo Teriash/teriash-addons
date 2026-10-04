@@ -55,3 +55,8 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Klanowicze Online: bardziej kompaktowe okno.
 - Zmniejszone odstępy między outfitem, nickiem, poziomem i lokalizacją.
 - Mniejszy nagłówek i padding wierszy.
+
+## v1.1.6
+- Klanowicze Online: okno można dowolnie rozszerzać i zwężać, przeciągając prawy dolny róg.
+- Szerokość i wysokość okna są zapamiętywane po odświeżeniu gry.
+- Lista automatycznie dopasowuje się do ustawionej wysokości i dostaje przewijanie, gdy brakuje miejsca.

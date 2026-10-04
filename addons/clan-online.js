@@ -6,6 +6,7 @@
 
   const STORAGE = "teriashAddons.clanOnline.settings";
   const POS = "teriashAddons.clanOnline.position";
+  const SIZE = "teriashAddons.clanOnline.size";
   const bridge = page.TeriashAddonsBridge || {};
   const getValue = bridge.getValue || ((k, d) => d);
   const setValue = bridge.setValue || (() => {});
@@ -34,7 +35,7 @@
   };
 
   const css = `
-#ta-clan-online{position:fixed;z-index:45;width:335px;max-height:430px;left:24px;top:120px;
+#ta-clan-online{position:fixed;z-index:45;width:335px;height:180px;min-width:285px;min-height:110px;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);resize:both;left:24px;top:120px;
 background:rgba(17,20,26,.96);border:1px solid #596171;border-radius:7px;color:#eee;
 font:12px Arial,sans-serif;box-shadow:0 4px 18px #0008;overflow:hidden}
 #ta-clan-online *{box-sizing:border-box}
@@ -44,7 +45,7 @@ background:#262c36;border-bottom:1px solid #444;cursor:move;user-select:none;tou
 #ta-clan-online .taco-count{opacity:.8}
 #ta-clan-online button{border:1px solid #555;background:#303743;color:#eee;border-radius:4px;cursor:pointer}
 #ta-clan-online .taco-gear,#ta-clan-online .taco-close{width:25px;height:23px}
-#ta-clan-online .taco-list{max-height:360px;overflow:auto}
+#ta-clan-online .taco-list{height:calc(100% - 32px);overflow:auto}
 #ta-clan-online .taco-row{display:grid;align-items:center;gap:4px;padding:4px 6px;border-bottom:1px solid #2d323b}
 #ta-clan-online .taco-row:last-child{border-bottom:0}
 #ta-clan-online .taco-outfit{width:32px;height:24px;background-repeat:no-repeat;background-position:0 0;flex:none;overflow:hidden}
@@ -81,6 +82,12 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   if (savedPos && Number.isFinite(savedPos.left) && Number.isFinite(savedPos.top)) {
     box.style.left = `${Math.max(0, Math.min(savedPos.left, innerWidth - 60))}px`;
     box.style.top = `${Math.max(0, Math.min(savedPos.top, innerHeight - 60))}px`;
+  }
+
+  const savedSize = getValue(SIZE, null);
+  if (savedSize && Number.isFinite(savedSize.width) && Number.isFinite(savedSize.height)) {
+    box.style.width = `${Math.max(285, Math.min(savedSize.width, innerWidth - 8))}px`;
+    box.style.height = `${Math.max(110, Math.min(savedSize.height, innerHeight - 8))}px`;
   }
 
   const settingsBox = document.createElement("div");
@@ -393,6 +400,19 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   handle.addEventListener("pointerup", endDrag, true);
   handle.addEventListener("pointercancel", endDrag, true);
 
+  // Zapamiętuj rozmiar zmieniany przez uchwyt w prawym dolnym rogu.
+  let resizeSaveTimer = null;
+  const resizeObserver = new ResizeObserver(entries => {
+    const entry = entries[0];
+    if (!entry || box.style.display === "none") return;
+    clearTimeout(resizeSaveTimer);
+    resizeSaveTimer = setTimeout(() => {
+      const r = box.getBoundingClientRect();
+      setValue(SIZE, { width: Math.round(r.width), height: Math.round(r.height) });
+    }, 120);
+  });
+  resizeObserver.observe(box);
+
   function restoreHook() {
     if (
       hookedCommunication &&
@@ -447,6 +467,8 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     destroy() {
       clearInterval(startup);
       clearInterval(timer);
+      clearTimeout(resizeSaveTimer);
+      resizeObserver.disconnect();
       restoreHook();
       settingsBox.remove();
       box.remove();
