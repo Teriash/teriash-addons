@@ -22,6 +22,8 @@
   let timer = null;
   let clanData = [];
   let lastRequest = 0;
+  let requestPending = false;
+  let requestPendingSince = 0;
   let hookedCommunication = null;
   let originalParseJSON = null;
 
@@ -159,8 +161,9 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   }
 
   function receiveMembers(raw) {
+    requestPending = false;
+    requestPendingSince = 0;
     clanData = parseMembers(raw);
-    console.log("[Teriash Clan Online] Odebrano listę klanu:", clanData.length);
     render();
   }
 
@@ -173,16 +176,24 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     const communication = page.Engine?.communication;
     if (!communication || typeof communication.parseJSON !== "function") return false;
 
-    if (hookedCommunication === communication && communication.parseJSON === hookedParseJSON) {
-      return true;
+    // Jeżeli jesteśmy już podpięci do TEJ instancji communication, niczego
+    // ponownie nie opakowujemy. Inny addon może po nas opakować parseJSON;
+    // ponowne hookowanie tutaj tworzyłoby łańcuch wrapperów przy każdym ticku.
+    if (hookedCommunication === communication) return true;
+
+    // Przy przelogowaniu Engine może utworzyć nową instancję communication.
+    // Starą przywracamy tylko wtedy, gdy nadal bezpośrednio wskazuje na nasz wrapper.
+    if (
+      hookedCommunication &&
+      hookedCommunication.parseJSON === hookedParseJSON &&
+      typeof originalParseJSON === "function"
+    ) {
+      hookedCommunication.parseJSON = originalParseJSON;
     }
 
-    // Jeżeli Engine został przeładowany, podpinamy się do nowej instancji.
     hookedCommunication = communication;
     originalParseJSON = communication.parseJSON;
-
     communication.parseJSON = hookedParseJSON;
-    console.log("[Teriash Clan Online] Hook Engine.communication.parseJSON aktywny.");
     return true;
   }
 
@@ -192,7 +203,6 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
         receiveMembers(data.members);
       }
     } catch (e) {
-      console.warn("[Teriash Clan Online] Błąd podczas odczytu members:", e);
     }
 
     return originalParseJSON.apply(this, arguments);
@@ -206,23 +216,52 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     return true;
   }
 
+  function gameReadyForClanRequest() {
+    // Podczas przelogowania/zmiany postaci nie wysyłamy zapytań.
+    // Czekamy aż istnieje bohater, komunikacja i funkcja _g.
+    return !!(
+      page.Engine?.hero?.d &&
+      page.Engine?.communication &&
+      typeof page.Engine.communication.parseJSON === "function" &&
+      typeof page._g === "function"
+    );
+  }
+
   function requestMembers(force = false) {
+    if (!gameReadyForClanRequest()) return;
     if (!installMembersHook()) return;
 
     const now = Date.now();
-    if (!force && now - lastRequest < 7000) return;
+
+    // Maksymalnie jedno zapytanie "members" naraz. Jeżeli odpowiedź zaginęła
+    // przy przelogowaniu, blokada sama wygasa po 15 s.
+    if (requestPending && now - requestPendingSince < 15000) return;
+    if (requestPending) {
+      requestPending = false;
+      requestPendingSince = 0;
+    }
+
+    // Twardy limit częstotliwości także dla wymuszonego odświeżenia.
+    // Chroni przed lawiną requestów przy przełączaniu postaci / ponownym montowaniu UI.
+    const minInterval = force ? 2500 : 10000;
+    if (now - lastRequest < minInterval) return;
+
     if (!hasClan()) {
       clanData = [];
       render("Nie należysz do żadnego klanu.");
       return;
     }
-    if (typeof page._g !== "function") return;
 
     lastRequest = now;
+    requestPending = true;
+    requestPendingSince = now;
+
     try {
       page._g("clan&a=members");
     } catch (e) {
-      console.warn("[Teriash Clan Online] Nie udało się wysłać clan&a=members:", e);
+      requestPending = false;
+      requestPendingSince = 0;
+      // Błędy techniczne zostawiamy ciche dla zwykłego gracza.
     }
   }
 
@@ -454,9 +493,14 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   }, 250);
 
   timer = setInterval(() => {
+    if (!gameReadyForClanRequest()) {
+      requestPending = false;
+      requestPendingSince = 0;
+      return;
+    }
     installMembersHook();
     requestMembers(false);
-  }, 2000);
+  }, 2500);
 
   page.TeriashClanOnline = {
     open() {

@@ -73,3 +73,10 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Klanowicze Online: zmniejszono minimalny dozwolony rozmiar okna.
 - Minimalna szerokość: 210 px.
 - Minimalna wysokość: 75 px.
+
+## v1.2.0
+- Usunięto zbędne komunikaty diagnostyczne z konsoli.
+- Klanowicze Online: naprawiono wielokrotne opakowywanie `Engine.communication.parseJSON`.
+- Dodano blokadę jednego aktywnego zapytania `clan&a=members` naraz.
+- Podczas przelogowania dodatek czeka na gotowy obiekt bohatera i komunikacji.
+- Automatyczne pobieranie listy jest ograniczone do jednego zapytania na 10 sekund.
