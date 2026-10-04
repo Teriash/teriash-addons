@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.1.8",
+  "suiteVersion": "1.1.9",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -31,7 +31,7 @@
       "id": "clanOnline",
       "name": "Klanowicze Online",
       "description": "Nick, poziom, profesja, outfit i aktualna lokalizacja klanowiczów online",
-      "version": "1.0.8",
+      "version": "1.0.9",
       "file": "addons/clan-online.js",
       "defaultEnabled": false,
       "settingsGlobal": "TeriashClanOnline",

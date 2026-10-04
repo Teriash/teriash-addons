@@ -35,7 +35,7 @@
   };
 
   const css = `
-#ta-clan-online{position:fixed;z-index:45;width:335px;height:180px;min-width:285px;min-height:110px;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);resize:both;left:24px;top:120px;
+#ta-clan-online{position:fixed;z-index:45;width:335px;height:180px;min-width:210px;min-height:75px;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);resize:both;left:24px;top:120px;
 background:rgba(17,20,26,.96);border:1px solid #596171;border-radius:7px;color:#eee;
 font:12px Arial,sans-serif;box-shadow:0 4px 18px #0008;overflow:hidden}
 #ta-clan-online *{box-sizing:border-box}
@@ -91,8 +91,8 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
 
   const savedSize = getValue(SIZE, null);
   if (savedSize && Number.isFinite(savedSize.width) && Number.isFinite(savedSize.height)) {
-    box.style.width = `${Math.max(285, Math.min(savedSize.width, innerWidth - 8))}px`;
-    box.style.height = `${Math.max(110, Math.min(savedSize.height, innerHeight - 8))}px`;
+    box.style.width = `${Math.max(210, Math.min(savedSize.width, innerWidth - 8))}px`;
+    box.style.height = `${Math.max(75, Math.min(savedSize.height, innerHeight - 8))}px`;
   }
 
   const settingsBox = document.createElement("div");

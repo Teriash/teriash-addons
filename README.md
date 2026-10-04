@@ -68,3 +68,8 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 ## v1.1.8
 - Klanowicze Online: listę można przewijać kółkiem myszy po najechaniu na okno.
 - Scroll jest przechwytywany przez listę, więc nie powinien przewijać/zoomować elementów gry pod oknem.
+
+## v1.1.9
+- Klanowicze Online: zmniejszono minimalny dozwolony rozmiar okna.
+- Minimalna szerokość: 210 px.
+- Minimalna wysokość: 75 px.
