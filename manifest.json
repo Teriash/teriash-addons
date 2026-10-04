@@ -22,7 +22,7 @@
     {
       "id": "deputyTimer",
       "name": "Deputy Timer",
-      "description": "Oznaczenie Z w oryginalnym minutniku NI",
+      "description": "Oznaczenie Z (zastępca) w oryginalnym minutniku NI",
       "version": "1.0.1",
       "file": "addons/deputy-timer.js",
       "defaultEnabled": false
