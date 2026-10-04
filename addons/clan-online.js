@@ -42,9 +42,9 @@
 background:rgba(17,20,26,.96);border:1px solid #596171;border-radius:7px;color:#eee;
 font:12px Arial,sans-serif;box-shadow:0 4px 18px #0008;overflow:hidden}
 #ta-clan-online *{box-sizing:border-box}
-#ta-clan-widget{position:fixed;z-index:44;left:16px;top:72px;width:42px;height:42px;
+#ta-clan-widget{position:fixed;z-index:44;left:16px;top:72px;width:32px;height:32px;
 display:flex;align-items:center;justify-content:center;background:rgba(17,20,26,.96);
-border:1px solid #596171;border-radius:10px;color:#eee;font:700 17px Arial,sans-serif;
+border:1px solid #596171;border-radius:7px;color:#eee;font:700 13px Arial,sans-serif;
 box-shadow:0 3px 12px #0008;cursor:pointer;user-select:none;touch-action:none}
 #ta-clan-widget:hover{background:#2b323d;border-color:#747e8d}
 #ta-clan-widget.ta-open{border-color:#7d8796;background:#262c36}
@@ -95,8 +95,8 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
 
   const savedWidgetPos = getValue(WIDGET_POS, null);
   if (savedWidgetPos && Number.isFinite(savedWidgetPos.left) && Number.isFinite(savedWidgetPos.top)) {
-    widget.style.left = `${Math.max(0, Math.min(savedWidgetPos.left, innerWidth - 42))}px`;
-    widget.style.top = `${Math.max(0, Math.min(savedWidgetPos.top, innerHeight - 42))}px`;
+    widget.style.left = `${Math.max(0, Math.min(savedWidgetPos.left, innerWidth - 32))}px`;
+    widget.style.top = `${Math.max(0, Math.min(savedWidgetPos.top, innerHeight - 32))}px`;
   }
 
   const box = document.createElement("div");

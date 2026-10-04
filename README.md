@@ -95,3 +95,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Klanowicze Online: dodano mini widget do szybkiego otwierania i zamykania listy.
 - Widget można przeciągać, a jego pozycja jest zapamiętywana.
 - Zamknięcie głównego okna nie usuwa mini widgetu.
+
+## v1.2.4
+- Mini widget Klanowicze Online zmniejszony do 32x32 px, czyli rozmiaru widgetu TA.
+- Zmniejszono również ikonę i zaokrąglenie, aby zachować proporcje.
