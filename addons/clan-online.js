@@ -34,23 +34,23 @@
   };
 
   const css = `
-#ta-clan-online{position:fixed;z-index:45;width:390px;max-height:480px;left:24px;top:120px;
+#ta-clan-online{position:fixed;z-index:45;width:335px;max-height:430px;left:24px;top:120px;
 background:rgba(17,20,26,.96);border:1px solid #596171;border-radius:7px;color:#eee;
 font:12px Arial,sans-serif;box-shadow:0 4px 18px #0008;overflow:hidden}
 #ta-clan-online *{box-sizing:border-box}
-#ta-clan-online .taco-head{height:36px;display:flex;align-items:center;gap:8px;padding:0 10px;
+#ta-clan-online .taco-head{height:32px;display:flex;align-items:center;gap:6px;padding:0 7px;
 background:#262c36;border-bottom:1px solid #444;cursor:move;user-select:none;touch-action:none}
 #ta-clan-online .taco-title{font-weight:700;flex:1}
 #ta-clan-online .taco-count{opacity:.8}
 #ta-clan-online button{border:1px solid #555;background:#303743;color:#eee;border-radius:4px;cursor:pointer}
-#ta-clan-online .taco-gear,#ta-clan-online .taco-close{width:27px;height:25px}
-#ta-clan-online .taco-list{max-height:400px;overflow:auto}
-#ta-clan-online .taco-row{display:grid;align-items:center;gap:7px;padding:6px 9px;border-bottom:1px solid #2d323b}
+#ta-clan-online .taco-gear,#ta-clan-online .taco-close{width:25px;height:23px}
+#ta-clan-online .taco-list{max-height:360px;overflow:auto}
+#ta-clan-online .taco-row{display:grid;align-items:center;gap:4px;padding:4px 6px;border-bottom:1px solid #2d323b}
 #ta-clan-online .taco-row:last-child{border-bottom:0}
 #ta-clan-online .taco-outfit{width:32px;height:24px;background-repeat:no-repeat;background-position:0 0;flex:none;overflow:hidden}
 #ta-clan-online .taco-nick{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ta-clan-online .taco-lvl{opacity:.9;white-space:nowrap}
-#ta-clan-online .taco-loc{font-size:11px;line-height:1.3;overflow:hidden}
+#ta-clan-online .taco-loc{font-size:11px;line-height:1.15;overflow:hidden}
 #ta-clan-online .taco-map{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #ta-clan-online .taco-empty{padding:18px;text-align:center;opacity:.7}
 #ta-clan-settings{position:fixed;z-index:46;width:290px;background:#171a20;border:1px solid #596171;
@@ -268,9 +268,9 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     }
 
     const cols =
-      `${settings.showOutfit ? "36px " : ""}` +
-      `minmax(110px,1fr) 58px` +
-      `${(settings.showExactLocation || settings.showMapOnly) ? " minmax(130px,1.2fr)" : ""}`;
+      `${settings.showOutfit ? "34px " : ""}` +
+      `minmax(92px,1fr) 48px` +
+      `${(settings.showExactLocation || settings.showMapOnly) ? " minmax(105px,1.05fr)" : ""}`;
 
     list.innerHTML = arr.map(m => {
       const src = settings.showOutfit ? outfitSrc(m.outfit) : "";

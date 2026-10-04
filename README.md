@@ -50,3 +50,8 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Klanowicze Online: usunięto informację pomocniczą z ustawień.
 - Lokalizacja ma teraz dwa tryby: dokładna pozycja (mapa + X,Y) albo tylko mapa.
 - Tryby lokalizacji są wzajemnie wykluczające; można też wyłączyć oba.
+
+## v1.1.5
+- Klanowicze Online: bardziej kompaktowe okno.
+- Zmniejszone odstępy między outfitem, nickiem, poziomem i lokalizacją.
+- Mniejszy nagłówek i padding wierszy.
