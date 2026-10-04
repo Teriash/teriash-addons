@@ -9,9 +9,15 @@
   const bridge = page.TeriashAddonsBridge || {};
   const getValue = bridge.getValue || ((k, d) => d);
   const setValue = bridge.setValue || (() => {});
-  const defaults = { showOutfit: true, showLocation: true };
+  const defaults = { showOutfit: true, showExactLocation: true, showMapOnly: false };
 
-  let settings = { ...defaults, ...(getValue(STORAGE, {}) || {}) };
+  const storedSettings = getValue(STORAGE, {}) || {};
+  let settings = { ...defaults, ...storedSettings };
+  if (!("showExactLocation" in storedSettings) && "showLocation" in storedSettings) {
+    settings.showExactLocation = !!storedSettings.showLocation;
+    settings.showMapOnly = false;
+  }
+  delete settings.showLocation;
   let timer = null;
   let clanData = [];
   let lastRequest = 0;
@@ -83,8 +89,8 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   settingsBox.innerHTML = `
     <div class="tacs-head">Klanowicze Online — ustawienia</div>
     <label><input type="checkbox" data-key="showOutfit"> Pokazuj aktualny outfit</label>
-    <label><input type="checkbox" data-key="showLocation"> Pokazuj aktualną lokalizację (mapa i X,Y)</label>
-    <div class="tacs-note">Lista jest pobierana bez potrzeby otwierania okna Klany → Klanowicze.</div>`;
+    <label><input type="checkbox" data-key="showExactLocation"> Pokazuj dokładną pozycję (mapa i X,Y)</label>
+    <label><input type="checkbox" data-key="showMapOnly"> Pokazuj tylko mapę</label>`;
   document.body.appendChild(settingsBox);
 
   function esc(v) {
@@ -264,7 +270,7 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     const cols =
       `${settings.showOutfit ? "36px " : ""}` +
       `minmax(110px,1fr) 58px` +
-      `${settings.showLocation ? " minmax(130px,1.2fr)" : ""}`;
+      `${(settings.showExactLocation || settings.showMapOnly) ? " minmax(130px,1.2fr)" : ""}`;
 
     list.innerHTML = arr.map(m => {
       const src = settings.showOutfit ? outfitSrc(m.outfit) : "";
@@ -277,12 +283,16 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
             : ""}
           <div class="taco-nick" title="${esc(m.nick)}">${esc(m.nick)}</div>
           <div class="taco-lvl" title="${esc(prof[m.prof] || m.prof)}">${esc(m.lvl)}${esc(m.prof || "")}</div>
-          ${settings.showLocation
+          ${settings.showExactLocation
             ? `<div class="taco-loc">
                  <div class="taco-map" title="${esc(m.map)}">${esc(m.map || "—")}</div>
                  <div>${esc(m.x)}, ${esc(m.y)}</div>
                </div>`
-            : ""}
+            : settings.showMapOnly
+              ? `<div class="taco-loc">
+                   <div class="taco-map" title="${esc(m.map)}">${esc(m.map || "—")}</div>
+                 </div>`
+              : ""}
         </div>`;
     }).join("");
   }
@@ -312,7 +322,16 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   settingsBox.addEventListener("change", e => {
     const input = e.target.closest("input[data-key]");
     if (!input) return;
-    settings[input.dataset.key] = input.checked;
+    const key = input.dataset.key;
+    settings[key] = input.checked;
+
+    if (input.checked && key === "showExactLocation") {
+      settings.showMapOnly = false;
+    } else if (input.checked && key === "showMapOnly") {
+      settings.showExactLocation = false;
+    }
+
+    syncSettings();
     setValue(STORAGE, settings);
     render();
   });

@@ -44,3 +44,9 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 ## v1.1.3
 - Klanowicze Online: poprawione wyświetlanie outfitów jako sprite 32 px.
 - Outfit jest kadrowany do górnych 24 px pierwszej klatki 32x48 (od pasa w górę).
+
+
+## v1.1.4
+- Klanowicze Online: usunięto informację pomocniczą z ustawień.
+- Lokalizacja ma teraz dwa tryby: dokładna pozycja (mapa + X,Y) albo tylko mapa.
+- Tryby lokalizacji są wzajemnie wykluczające; można też wyłączyć oba.
