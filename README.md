@@ -60,3 +60,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Klanowicze Online: okno można dowolnie rozszerzać i zwężać, przeciągając prawy dolny róg.
 - Szerokość i wysokość okna są zapamiętywane po odświeżeniu gry.
 - Lista automatycznie dopasowuje się do ustawionej wysokości i dostaje przewijanie, gdy brakuje miejsca.
+
+## v1.1.7
+- Klanowicze Online: jeszcze mniejsze odstępy między outfitem, nickiem, poziomem i lokalizacją.
+- Paski przewijania są ciemne i dopasowane do stylistyki okna.
