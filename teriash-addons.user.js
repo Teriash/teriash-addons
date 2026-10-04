@@ -1,17 +1,18 @@
 // ==UserScript==
 // @name         Teriash Addons
 // @namespace    https://margonem.pl/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Panel i loader dodatków Teriash do Margonem
 // @author       Teriash
-// @updateURL    https://raw.githubusercontent.com/Teriash/teriash-addons/main/teriash-addons.user.js
-// @downloadURL  https://raw.githubusercontent.com/Teriash/teriash-addons/main/teriash-addons.user.js
+// @updateURL    https://github.com/Teriash/teriash-addons/raw/refs/heads/main/teriash-addons.user.js
+// @downloadURL  https://github.com/Teriash/teriash-addons/raw/refs/heads/main/teriash-addons.user.js
 // @match        https://*.margonem.pl/*
 // @match        https://*.margonem.com/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
 // @grant        unsafeWindow
+// @connect       cdn.jsdelivr.net
 // @run-at       document-body
 // ==/UserScript==
 
@@ -19,7 +20,7 @@
   "use strict";
 
   const page = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
-  const BASE = "https://raw.githubusercontent.com/Teriash/teriash-addons/main/";
+  const BASE = "https://cdn.jsdelivr.net/gh/Teriash/teriash-addons@main/";
   const CACHE = String(Date.now());
 
   const url = path => `${BASE}${path}?v=${CACHE}`;
@@ -31,6 +32,7 @@
   };
 
   try {
+    console.info("[Teriash Addons] Start loadera v1.0.1");
     const response = await fetch(url("manifest.json"));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const manifest = await response.json();
@@ -57,11 +59,13 @@
     const style = document.createElement("link");
     style.rel = "stylesheet";
     style.href = url("core/panel.css");
-    document.head.appendChild(style);
+    (document.head || document.documentElement).appendChild(style);
 
     const script = document.createElement("script");
     script.src = url("core/panel.js");
-    document.head.appendChild(script);
+    script.onload = () => console.info("[Teriash Addons] Panel załadowany");
+    script.onerror = () => console.error("[Teriash Addons] Błąd ładowania core/panel.js", script.src);
+    (document.head || document.documentElement).appendChild(script);
   } catch (error) {
     console.error("[Teriash Addons] Nie udało się uruchomić loadera:", error);
   }

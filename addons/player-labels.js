@@ -1,4 +1,3 @@
-const unsafeWindow = window;
 (() => {
     'use strict';
 
