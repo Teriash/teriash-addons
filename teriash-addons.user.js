@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Teriash Addons
 // @namespace    https://margonem.pl/
-// @version      1.1.0
+// @version      1.1.1
 // @description  Panel i loader dodatków Teriash do Margonem
 // @author       Teriash
 // @updateURL    https://raw.githubusercontent.com/Teriash/teriash-addons/main/teriash-addons.user.js
@@ -74,7 +74,7 @@
   }
 
   try {
-    console.info("[Teriash Addons] Start loadera v1.1.0 (RAW/no-cache)");
+    console.info("[Teriash Addons] Start loadera v1.1.1 (RAW/no-cache)");
 
     if (!(await waitForGameView())) {
       console.info("[Teriash Addons] To nie jest widok gry — panel nie zostanie uruchomiony.");
@@ -115,7 +115,7 @@
     script.textContent = `${js}\n//# sourceURL=teriash-addons/core/panel.js`;
     (document.head || document.documentElement).appendChild(script);
 
-    console.info("[Teriash Addons] Panel v1.1.0 załadowany z RAW");
+    console.info("[Teriash Addons] Panel v1.1.1 załadowany z RAW");
   } catch (error) {
     console.error("[Teriash Addons] Nie udało się uruchomić loadera:", error);
   }

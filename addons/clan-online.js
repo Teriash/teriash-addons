@@ -81,8 +81,32 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     return String(v ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  let refreshBusy = false;
+  let lastNativeRefresh = 0;
+
+  function requestMembers(force = false) {
+    const now = Date.now();
+    if (refreshBusy || (!force && now - lastNativeRefresh < 15000)) return;
+    if (typeof page._g !== "function") return;
+
+    refreshBusy = true;
+    lastNativeRefresh = now;
+    try {
+      const result = page._g("clan&a=members");
+      Promise.resolve(result).catch(() => {}).finally(() => {
+        setTimeout(() => { refreshBusy = false; render(); }, 350);
+      });
+    } catch (e) {
+      refreshBusy = false;
+      console.warn("[Klanowicze Online] Nie udało się pobrać członków klanu:", e);
+    }
+  }
+
   function members() {
-    const list = page.Engine?.clan?.getMemberList?.();
+    const clan = page.Engine?.clan;
+    const list = clan && typeof clan.getMemberList === "function"
+      ? clan.getMemberList()
+      : null;
     if (!list) return [];
     return Object.values(list)
       .filter(x => Array.isArray(x) && Number(x[9]) === 0)
@@ -95,8 +119,13 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
 
   function outfitSrc(path) {
     if (!path) return "";
-    if (/^https?:\/\//i.test(path)) return path;
-    return path.startsWith("/") ? path : `/${path}`;
+    try {
+      const resolved = page.Engine?.interface?.getUrl?.(path);
+      if (typeof resolved === "string" && resolved) return resolved;
+    } catch (e) {
+      console.warn("[Klanowicze Online] Nie udało się rozwiązać outfitu:", path, e);
+    }
+    return "";
   }
 
   function render() {
@@ -109,7 +138,7 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     }
     list.innerHTML = arr.map(m => `
       <div class="taco-row" data-id="${esc(m.id)}" style="grid-template-columns:${settings.showOutfit ? "36px " : ""}minmax(110px,1fr) 58px ${settings.showLocation ? "minmax(130px,1.2fr)" : ""}">
-        ${settings.showOutfit ? `<img class="taco-outfit" src="${esc(outfitSrc(m.outfit))}" alt="">` : ""}
+        ${settings.showOutfit ? (outfitSrc(m.outfit) ? `<img class="taco-outfit" src="${esc(outfitSrc(m.outfit))}" alt="">` : `<div class="taco-outfit"></div>`) : ""}
         <div class="taco-nick" title="${esc(m.nick)}">${esc(m.nick)}</div>
         <div class="taco-lvl" title="${esc(prof[m.prof] || m.prof)}">${esc(m.lvl)}${esc(m.prof || "")}</div>
         ${settings.showLocation ? `<div class="taco-loc"><div class="taco-map" title="${esc(m.map)}">${esc(m.map || "—")}</div><div>${esc(m.x)}, ${esc(m.y)}</div></div>` : ""}
@@ -175,11 +204,15 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   handle.addEventListener("pointerup", endDrag, true);
   handle.addEventListener("pointercancel", endDrag, true);
 
+  requestMembers(true);
   render();
-  timer = setInterval(render, 2000);
+  timer = setInterval(() => {
+    requestMembers(false);
+    render();
+  }, 2000);
 
   page.TeriashClanOnline = {
-    open() { box.style.display = ""; render(); },
+    open() { box.style.display = ""; requestMembers(true); render(); },
     close() { box.style.display = "none"; settingsBox.style.display = "none"; },
     openSettings() {
       syncSettings();

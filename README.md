@@ -35,3 +35,7 @@ Panel Teriash Addons uruchamia się wyłącznie po wykryciu właściwego widoku 
 
 ## v1.1.0
 Dodano moduł **Klanowicze Online**. Pokazuje osoby online na podstawie `Engine.clan.getMemberList()`, wraz z nickiem, poziomem, profesją, outfitem i lokalizacją. W ustawieniach można osobno wyłączyć outfit oraz mapę i koordynaty.
+
+
+## v1.1.1
+Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, więc nie wymaga ręcznego otwierania okna Klany. Outfit jest rozwiązywany przez `Engine.interface.getUrl()` zamiast bezpośredniej ścieżki z danych członka.
