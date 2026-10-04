@@ -90,3 +90,8 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Naprawiono niewidoczną opcję sortowania w ustawieniach Klanowicze Online.
 - Panel ustawień dopasowuje wysokość do zawartości.
 - Na mniejszych ekranach panel ustawień można przewijać.
+
+## v1.2.3
+- Klanowicze Online: dodano mini widget do szybkiego otwierania i zamykania listy.
+- Widget można przeciągać, a jego pozycja jest zapamiętywana.
+- Zamknięcie głównego okna nie usuwa mini widgetu.

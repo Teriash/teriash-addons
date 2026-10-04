@@ -7,6 +7,7 @@
   const STORAGE = "teriashAddons.clanOnline.settings";
   const POS = "teriashAddons.clanOnline.position";
   const SIZE = "teriashAddons.clanOnline.size";
+  const WIDGET_POS = "teriashAddons.clanOnline.widgetPosition";
   const bridge = page.TeriashAddonsBridge || {};
   const getValue = bridge.getValue || ((k, d) => d);
   const setValue = bridge.setValue || (() => {});
@@ -41,6 +42,12 @@
 background:rgba(17,20,26,.96);border:1px solid #596171;border-radius:7px;color:#eee;
 font:12px Arial,sans-serif;box-shadow:0 4px 18px #0008;overflow:hidden}
 #ta-clan-online *{box-sizing:border-box}
+#ta-clan-widget{position:fixed;z-index:44;left:16px;top:72px;width:42px;height:42px;
+display:flex;align-items:center;justify-content:center;background:rgba(17,20,26,.96);
+border:1px solid #596171;border-radius:10px;color:#eee;font:700 17px Arial,sans-serif;
+box-shadow:0 3px 12px #0008;cursor:pointer;user-select:none;touch-action:none}
+#ta-clan-widget:hover{background:#2b323d;border-color:#747e8d}
+#ta-clan-widget.ta-open{border-color:#7d8796;background:#262c36}
 #ta-clan-online .taco-head{height:32px;display:flex;align-items:center;gap:6px;padding:0 7px;
 background:#262c36;border-bottom:1px solid #444;cursor:move;user-select:none;touch-action:none}
 #ta-clan-online .taco-title{font-weight:700;flex:1}
@@ -79,6 +86,18 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   style.id = "ta-clan-online-style";
   style.textContent = css;
   document.head.appendChild(style);
+
+  const widget = document.createElement("div");
+  widget.id = "ta-clan-widget";
+  widget.title = "Klanowicze Online — otwórz/zamknij";
+  widget.textContent = "♟";
+  document.body.appendChild(widget);
+
+  const savedWidgetPos = getValue(WIDGET_POS, null);
+  if (savedWidgetPos && Number.isFinite(savedWidgetPos.left) && Number.isFinite(savedWidgetPos.top)) {
+    widget.style.left = `${Math.max(0, Math.min(savedWidgetPos.left, innerWidth - 42))}px`;
+    widget.style.top = `${Math.max(0, Math.min(savedWidgetPos.top, innerHeight - 42))}px`;
+  }
 
   const box = document.createElement("div");
   box.id = "ta-clan-online";
@@ -440,10 +459,77 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     toggleSettings();
   });
 
+  function setPanelVisible(visible) {
+    box.style.display = visible ? "" : "none";
+    if (!visible) settingsBox.style.display = "none";
+    widget.classList.toggle("ta-open", visible);
+    widget.title = visible
+      ? "Klanowicze Online — zamknij"
+      : "Klanowicze Online — otwórz";
+    if (visible) {
+      render();
+      requestMembers(true);
+    }
+  }
+
   box.querySelector(".taco-close").addEventListener("click", () => {
-    box.style.display = "none";
-    settingsBox.style.display = "none";
+    setPanelVisible(false);
   });
+
+  let widgetDrag = null;
+  let widgetMoved = false;
+
+  widget.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    const r = widget.getBoundingClientRect();
+    widgetDrag = {
+      id: e.pointerId,
+      sx: e.clientX,
+      sy: e.clientY,
+      left: r.left,
+      top: r.top
+    };
+    widgetMoved = false;
+    try { widget.setPointerCapture(e.pointerId); } catch {}
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+
+  widget.addEventListener("pointermove", e => {
+    if (!widgetDrag || e.pointerId !== widgetDrag.id) return;
+    const dx = e.clientX - widgetDrag.sx;
+    const dy = e.clientY - widgetDrag.sy;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) widgetMoved = true;
+
+    const left = Math.max(0, Math.min(widgetDrag.left + dx, innerWidth - widget.offsetWidth));
+    const top = Math.max(0, Math.min(widgetDrag.top + dy, innerHeight - widget.offsetHeight));
+    widget.style.left = `${left}px`;
+    widget.style.top = `${top}px`;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+
+  const endWidgetDrag = e => {
+    if (!widgetDrag || e.pointerId !== widgetDrag.id) return;
+    try { widget.releasePointerCapture(e.pointerId); } catch {}
+    const r = widget.getBoundingClientRect();
+    setValue(WIDGET_POS, { left: r.left, top: r.top });
+    const shouldToggle = !widgetMoved;
+    widgetDrag = null;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    if (shouldToggle) {
+      setPanelVisible(box.style.display === "none");
+    }
+  };
+
+  widget.addEventListener("pointerup", endWidgetDrag, true);
+  widget.addEventListener("pointercancel", e => {
+    if (!widgetDrag || e.pointerId !== widgetDrag.id) return;
+    try { widget.releasePointerCapture(e.pointerId); } catch {}
+    widgetDrag = null;
+  }, true);
 
   const handle = box.querySelector(".taco-head");
   let drag = null;
@@ -518,6 +604,7 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   }
 
   render();
+  widget.classList.add("ta-open");
 
   // Engine może pojawić się chwilę po załadowaniu dodatku.
   let startupTries = 0;
@@ -544,13 +631,10 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
 
   page.TeriashClanOnline = {
     open() {
-      box.style.display = "";
-      requestMembers(true);
-      render();
+      setPanelVisible(true);
     },
     close() {
-      box.style.display = "none";
-      settingsBox.style.display = "none";
+      setPanelVisible(false);
     },
     openSettings() {
       toggleSettings(true);
@@ -569,6 +653,7 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
       restoreHook();
       settingsBox.remove();
       box.remove();
+      widget.remove();
       style.remove();
       delete page.TeriashClanOnline;
     }
