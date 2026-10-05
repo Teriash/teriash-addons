@@ -99,3 +99,10 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 ## v1.2.4
 - Mini widget Klanowicze Online zmniejszony do 32x32 px, czyli rozmiaru widgetu TA.
 - Zmniejszono również ikonę i zaokrąglenie, aby zachować proporcje.
+
+
+## v1.2.5
+- Klanowicze Online: kliknięcie w wiersz klanowicza otwiera natywne menu Margonem.
+- Menu zawiera wiadomość, ekwipunek, zaproszenie do przyjaciół, dodanie do wrogów i zaproszenie do grupy.
+- Gdy `accountId` jest dostępne z `Engine.others` (gracz na tej samej mapie), menu zawiera również „Pokaż profil”.
+- Naprawiono składanie adresu outfitu tak, aby nie tworzyć podwójnego ukośnika po `/postacie/`.

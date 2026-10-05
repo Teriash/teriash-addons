@@ -60,7 +60,8 @@ background:#262c36;border-bottom:1px solid #444;cursor:move;user-select:none;tou
 #ta-clan-online .taco-list::-webkit-scrollbar-thumb{background:#596171;border:2px solid #1b1f26;border-radius:6px}
 #ta-clan-online .taco-list::-webkit-scrollbar-thumb:hover{background:#747e8d}
 #ta-clan-online .taco-list::-webkit-scrollbar-corner{background:#1b1f26}
-#ta-clan-online .taco-row{display:grid;align-items:center;gap:2px;padding:3px 5px;border-bottom:1px solid #2d323b}
+#ta-clan-online .taco-row{display:grid;align-items:center;gap:2px;padding:3px 5px;border-bottom:1px solid #2d323b;cursor:pointer}
+#ta-clan-online .taco-row:hover{background:rgba(255,255,255,.055)}
 #ta-clan-online .taco-row:last-child{border-bottom:0}
 #ta-clan-online .taco-outfit{width:32px;height:24px;background-repeat:no-repeat;background-position:0 0;flex:none;overflow:hidden}
 #ta-clan-online .taco-nick{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -332,7 +333,7 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     // pomniejszyłaby cały arkusz klatek. Tło 32x24 wycina górną połowę
     // pierwszej klatki 32x48 (postać od pasa w górę).
     if (/^(?:\/)?(?:paid|kuf|eve|clan|premium|event|npc)\//i.test(raw)) {
-      return `https://micc.garmory-cdn.cloud/obrazki/postacie/${raw.startsWith("/") ? raw : "/" + raw}`;
+      return `https://micc.garmory-cdn.cloud/obrazki/postacie/${raw.replace(/^\/+/, "")}`;
     }
 
     if (/^https?:\/\//i.test(raw)) return raw;
@@ -346,7 +347,83 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
       } catch {}
     }
 
-    return `https://micc.garmory-cdn.cloud/obrazki/postacie/${raw.startsWith("/") ? raw : "/" + raw}`;
+    return `https://micc.garmory-cdn.cloud/obrazki/postacie/${raw.replace(/^\/+/, "")}`;
+  }
+
+  function getLiveOther(member) {
+    try {
+      const other = page.Engine?.others?.getById?.(Number(member.id));
+      if (!other) return null;
+      const accountId = Number(
+        (typeof other.getAccountId === "function" ? other.getAccountId() : 0) ||
+        other.d?.account || other.d?.accountId || 0
+      );
+      return { other, accountId: accountId || null };
+    } catch {
+      return null;
+    }
+  }
+
+  function openMemberMenu(member, event) {
+    const Engine = page.Engine;
+    if (!Engine?.interface?.showPopupMenu || !member) return;
+
+    const menu = [];
+    const nick = String(member.nick || "");
+    const id = Number(member.id);
+    const live = getLiveOther(member);
+    const accountId = live?.accountId || null;
+
+    // Te same natywne akcje, których używa klient Margonem. Sam popup również
+    // tworzy Engine.interface.showPopupMenu, więc wygląd i zachowanie pozostają natywne.
+    menu.push(["Wyślij wiadomość", () => {
+      Engine.chatController?.getChatInputWrapper?.().setPrivateMessageProcedure(nick);
+    }]);
+
+    // ShowEqManager pobiera ekwipunek z CDN po ID postaci. Account ID nie jest
+    // do tego wymagane (pakiet clan&a=members go nie zawiera).
+    if (Engine.showEqManager?.update && id) {
+      menu.push(["Pokaż ekwipunek", () => {
+        Engine.showEqManager.update({
+          id,
+          account: accountId || 0,
+          lvl: Number(member.lvl) || 0,
+          nick,
+          prof: String(member.prof || ""),
+          icon: String(member.outfit || ""),
+          world: Engine.worldConfig?.getWorldName?.()
+        });
+      }]);
+    }
+
+    menu.push(["Zaproś do przyjaciół", () => {
+      page._g?.(`friends&a=finvite&nick=${nick.trim().split(" ").join("_")}`);
+    }]);
+    menu.push(["Dodaj do wrogów", () => {
+      page._g?.(`friends&a=eadd&nick=${nick.trim().split(" ").join("_")}`);
+    }]);
+    if (id) {
+      menu.push(["Zaproś do grupy", () => page._g?.(`party&a=inv&id=${id}`)]);
+    }
+
+    // accountId nie występuje w 11-polowym clan&a=members. Jeżeli gracz jest
+    // jednocześnie na naszej mapie, bierzemy je z Engine.others i dokładamy profil.
+    if (accountId && id) {
+      menu.push(["Pokaż profil", () => {
+        if (typeof Engine.iframeWindowManager?.newPlayerProfile === "function") {
+          Engine.iframeWindowManager.newPlayerProfile({ accountId, characterId: id });
+        }
+      }]);
+    }
+
+    const e = {
+      type: "click",
+      clientX: event.clientX,
+      clientY: event.clientY,
+      stopPropagation: () => event.stopPropagation(),
+      preventDefault: () => event.preventDefault()
+    };
+    Engine.interface.showPopupMenu(menu, e, { header: nick });
   }
 
   function render(message = "") {
@@ -430,6 +507,16 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     e.preventDefault();
     e.stopPropagation();
   }, { passive: false });
+
+  clanList.addEventListener("click", e => {
+    const row = e.target.closest(".taco-row[data-id]");
+    if (!row || !clanList.contains(row)) return;
+    const member = clanData.find(m => Number(m.id) === Number(row.dataset.id));
+    if (!member) return;
+    e.stopPropagation();
+    e.preventDefault();
+    openMemberMenu(member, e);
+  });
 
   settingsBox.addEventListener("change", e => {
     const input = e.target.closest("input[data-key]");
