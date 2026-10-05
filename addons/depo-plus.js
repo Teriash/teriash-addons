@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.5.2";
+  const VERSION = "0.5.3";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -85,12 +85,14 @@
     return new Promise(resolve => window._g(q, r => resolve(r)));
   }
 
-  async function splitViaBag(id) {
+  async function splitViaBag(id, splitAmount) {
     if (busy) return console.warn(`${PREFIX} Inna operacja jest jeszcze wykonywana.`), false;
     const src = readDepoItems().find(v => String(v.id) === String(id));
     if (!src) return console.error(`${PREFIX} Nie znaleziono przedmiotu w depozycie.`), false;
+
     const total = Number(src.amount);
-    if (!Number.isFinite(total) || total <= 1) return false;
+    const split = Number(splitAmount);
+    if (!Number.isInteger(split) || split < 1 || split >= total) return false;
     if (String(src.cansplit) === "0") return console.error(`${PREFIX} Tego przedmiotu nie można dzielić.`), false;
     if (typeof window._g !== "function") return console.error(`${PREFIX} Brak _g.`), false;
 
@@ -99,62 +101,15 @@
 
     busy = true;
     const originalPos = {x: src.x, y: src.y};
-    console.group(`${PREFIX} PODZIAŁ ${src.name}`);
+    console.group(`${PREFIX} PODZIAŁ ${src.name}: ${split}/${total}`);
     try {
+      // Dopiero po zatwierdzeniu natywnego okna przenosimy stos do torby.
       await request(`depo&get=${src.id}`);
       const inBag = await waitFor(() => readBagItems().find(v => String(v.id) === String(src.id)));
       if (!inBag) throw new Error("Nie udało się wyjąć przedmiotu do torby.");
 
       const beforeSplit = new Set(readBagItems().map(v => String(v.id)));
-      const originalG = window._g;
-      let resolveSent;
-      const sentPromise = new Promise(resolve => resolveSent = resolve);
-      let restored = false;
-      const restoreG = () => {
-        if (restored) return;
-        restored = true;
-        window._g = originalG;
-      };
-
-      window._g = function(task, cb, ...rest) {
-        if (typeof task === "string" &&
-            task.startsWith("moveitem") &&
-            task.includes(`id=${src.id}`) &&
-            task.includes("&split=")) {
-          restoreG();
-          const result = originalG.call(this, task, cb, ...rest);
-          resolveSent(true);
-          return result;
-        }
-        return originalG.call(this, task, cb, ...rest);
-      };
-
-      // Oryginalny mechanizm Margonem. Wyświetla natywne okno
-      // „Podziel przedmiot, maksymalna ilość: ...”.
-      Engine.heroEquipment.splitItem(inBag.item, inBag.x, inBag.y, true);
-
-      // Czekamy na zatwierdzenie albo zamknięcie natywnego okna.
-      let appeared = false;
-      const dialogClosed = (async () => {
-        const until = Date.now() + 60000;
-        while (Date.now() < until) {
-          const dlg = document.querySelector(".askAlert");
-          if (dlg) appeared = true;
-          if (appeared && !dlg) return false;
-          await sleep(100);
-        }
-        return false;
-      })();
-
-      const sent = await Promise.race([sentPromise, dialogClosed]);
-      restoreG();
-
-      if (!sent) {
-        // Anulowano: odkładamy niezmieniony stos z powrotem.
-        await request(`depo&put=${src.id}&x=${originalPos.x}&y=${originalPos.y}`);
-        await waitFor(() => readDepoItems().some(v => String(v.id) === String(src.id)), 5000);
-        return false;
-      }
+      await request(`moveitem&findslot=1&st=0&id=${src.id}&x=${inBag.x}&y=${inBag.y}&split=${split}`);
 
       const newPart = await waitFor(() => {
         const now = readBagItems();
@@ -164,6 +119,7 @@
 
       await request(`depo&put=${src.id}&x=${originalPos.x}&y=${originalPos.y}`);
       await waitFor(() => readDepoItems().some(v => String(v.id) === String(src.id)), 5000);
+
       await request(`depo&put=${newPart.id}&x=${freeDepo.x}&y=${freeDepo.y}`);
       const returned = await waitFor(() => readDepoItems().some(v => String(v.id) === String(newPart.id)), 5000);
       if (!returned) throw new Error("Nowy stos nie wrócił automatycznie do depozytu.");
@@ -436,7 +392,39 @@
       window.mAlert ? window.mAlert("Tego przedmiotu nie można podzielić.") : console.warn(`${PREFIX} Tego przedmiotu nie można podzielić.`);
       return;
     }
-    splitViaBag(item.id);
+
+    // To samo natywne okno, którego używa Engine.heroEquipment.alertWindow,
+    // ale bez wykonywania requestu przed kliknięciem OK.
+    const max = total - 1;
+    let input;
+    const html = `Podziel przedmiot, maksymalna ilość: ${max}<div class="input-wrapper"><input class="default amount-input" placeholder="..." /></div>`;
+
+    window.mAlert(html, [{
+      txt: "Ok",
+      callback: function() {
+        let value = Number(input?.val?.());
+        if (!Number.isInteger(value) || value < 1 || value > max) return false;
+        // Dopiero tutaj zaczyna się depo -> torba -> split -> depo.
+        setTimeout(() => splitViaBag(item.id, value), 0);
+        return true;
+      }
+    }, {
+      txt: "Anuluj",
+      callback: function() {
+        return true;
+      }
+    }], function(alert) {
+      input = alert.$.find(".default");
+      const amountInput = alert.$.find(".amount-input");
+      alert.$.addClass("askAlert");
+      try {
+        if (typeof window.setInputMask === "function" && window.InputMaskData_default?.TYPE?.NUMBER != null)
+          window.setInputMask(amountInput, window.InputMaskData_default.TYPE.NUMBER);
+      } catch {}
+      try {
+        if (!(typeof window.mobileCheck === "function" && window.mobileCheck())) amountInput.focus();
+      } catch { amountInput.focus(); }
+    });
   }
 
   function canSplitDepoItem(item) {
