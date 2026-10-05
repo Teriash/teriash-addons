@@ -135,7 +135,13 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - `TeriashDepoPlus.splitTest(ID, X, Y, ILOSC)` waliduje przedmiot, ilość i pusty slot oraz loguje odpowiedź serwera.
 
 
-### v1.3.1
+### v1.3.2
 - Depozyt+ 0.3.0: PPM na przedmiocie ma opcję „Podziel”.
 - Podział jest wykonywany automatycznie przez sekwencję depozyt → torba → podział → depozyt.
 - Oryginalny stos wraca na swoje miejsce, wydzielona część trafia do wolnego slotu tej samej zakładki.
+
+
+### v1.3.2
+- Depozyt+ v0.3.1: „Podziel” jest wstrzykiwane bezpośrednio do oryginalnego menu PPM Margonem.
+- Opcja pojawia się tylko dla stosów w prywatnym depozycie z `amount > 1` i `cansplit = 1`.
+- Usunięto własne zastępcze menu kontekstowe Depozyt+.

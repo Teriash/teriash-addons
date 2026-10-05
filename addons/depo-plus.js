@@ -2,12 +2,11 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.3.0";
+  const VERSION = "0.3.1";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
   let busy = false;
-  let menu = null;
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const privateLoc = () => window.Engine?.itemsFetchData?.NEW_PRIVATE_DEPO_ITEM?.loc;
@@ -150,49 +149,50 @@
     splitViaBag(item.id, amount);
   }
 
-  function closeMenu() { if (menu) menu.remove(); menu = null; }
-  function showMenu(e, item) {
-    closeMenu();
-    const m = document.createElement("div"); menu = m;
-    Object.assign(m.style, {position:"fixed", left:`${e.clientX}px`, top:`${e.clientY}px`, zIndex:"100000",
-      minWidth:"145px", background:"#171a20", border:"1px solid #626b79", boxShadow:"0 4px 16px #000b",
-      color:"#eee", font:"12px Arial", borderRadius:"4px", overflow:"hidden"});
-    const add = (txt, fn, disabled=false) => {
-      const b=document.createElement("div"); b.textContent=txt;
-      Object.assign(b.style,{padding:"7px 12px",cursor:disabled?"default":"pointer",opacity:disabled?".45":"1",whiteSpace:"nowrap"});
-      if(!disabled){ b.onmouseenter=()=>b.style.background="#343a46"; b.onmouseleave=()=>b.style.background=""; b.onclick=()=>{closeMenu();fn();}; }
-      m.appendChild(b);
-    };
-    add("Wyjmij", () => window._g(`depo&get=${item.id}`));
-    const canSplit = Number(item.getAmountStat?.()) > 1 && String(item.getCansplitStat?.()) !== "0";
-    add("Podziel", () => askSplit(item), !canSplit);
-    document.body.appendChild(m);
-    requestAnimationFrame(()=>{
-      const r=m.getBoundingClientRect();
-      if(r.right>innerWidth) m.style.left=`${Math.max(0,innerWidth-r.width-4)}px`;
-      if(r.bottom>innerHeight) m.style.top=`${Math.max(0,innerHeight-r.height-4)}px`;
+  function canSplitDepoItem(item) {
+    return isPrivateDepoItem(item) &&
+      Number(item.getAmountStat?.()) > 1 &&
+      String(item.getCansplitStat?.()) === "1";
+  }
+
+  function patchDepoItem(item) {
+    if (!isPrivateDepoItem(item) || item.__teriashDepoPlusMenuPatched) return;
+    const original = item.createOptionMenu;
+    if (typeof original !== "function") return;
+
+    Object.defineProperty(item, "__teriashDepoPlusMenuPatched", {
+      value: true, configurable: true
     });
+
+    item.createOptionMenu = function(event, extraOptions, disabledOptions, context) {
+      let extra = extraOptions;
+      if (canSplitDepoItem(this)) {
+        const splitOption = {
+          txt: (typeof window._t === "function" ? window._t("split", null, "menu") : "Podziel"),
+          f: () => askSplit(this)
+        };
+        if (!extra) extra = [splitOption];
+        else if (Array.isArray(extra)) extra = [...extra, splitOption];
+        else extra = [extra, splitOption];
+      }
+      return original.call(this, event, extra, disabledOptions, context);
+    };
   }
 
   function installMarker() {
-    document.querySelectorAll(".depo-window, .depo, .window-depo").forEach(root => {
-      if (root.dataset.teriashDepoPlus === "3") return;
-      root.dataset.teriashDepoPlus = "3";
-      root.addEventListener("contextmenu", e => {
-        const el=e.target.closest?.(".item"); if(!el||!window.jQuery)return;
-        const item=window.jQuery(el).data("item"); if(!isPrivateDepoItem(item))return;
-        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
-        showMenu(e,item);
-      }, true);
+    document.querySelectorAll(".depo-window .item, .depo .item, .window-depo .item").forEach(el => {
+      try {
+        const item = window.jQuery ? window.jQuery(el).data("item") : null;
+        patchDepoItem(item);
+      } catch {}
     });
   }
 
   function start(){
     installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
-    document.addEventListener("pointerdown", e=>{ if(menu&&!menu.contains(e.target)) closeMenu(); }, true);
-    console.info(`${PREFIX} v${VERSION} uruchomiony. PPM na przedmiocie: Wyjmij / Podziel.`);
+    console.info(`${PREFIX} v${VERSION} uruchomiony. Opcja „Podziel” jest dodawana do natywnego menu PPM tylko dla podzielnych stosów w prywatnym depozycie.`);
   }
-  function destroy(){observer?.disconnect();observer=null;closeMenu();}
+  function destroy(){observer?.disconnect();observer=null;}
 
   window.TeriashDepoPlus={version:VERSION,snapshot:printSnapshot,splitViaBag,items:()=>lastSnapshot.length?lastSnapshot:readDepoItems(),destroy};
   start();
