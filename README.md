@@ -133,3 +133,9 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 ### v1.3.0
 - Depozyt+ 0.2.0: kontrolowany test bezpośredniego dzielenia stosu w prywatnym depozycie przez pojedynczy request `depo&move=...&split=...`.
 - `TeriashDepoPlus.splitTest(ID, X, Y, ILOSC)` waliduje przedmiot, ilość i pusty slot oraz loguje odpowiedź serwera.
+
+
+### v1.3.1
+- Depozyt+ 0.3.0: PPM na przedmiocie ma opcję „Podziel”.
+- Podział jest wykonywany automatycznie przez sekwencję depozyt → torba → podział → depozyt.
+- Oryginalny stos wraca na swoje miejsce, wydzielona część trafia do wolnego slotu tej samej zakładki.
