@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.4.1";
+  const VERSION = "0.5.0";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -214,6 +214,80 @@
     }
   }
 
+
+  function isBagStackItem(item) {
+    return !!item && item.loc === equipLoc() && Number(item.getAmountStat?.()) > 0;
+  }
+
+  function sameStackTemplate(a, b) {
+    if (!a || !b || String(a.id) === String(b.id)) return false;
+    if (Number(a.getAmountStat?.()) <= 0 || Number(b.getAmountStat?.()) <= 0) return false;
+    if (a.tpl != null && b.tpl != null) return String(a.tpl) === String(b.tpl);
+    return a.name === b.name;
+  }
+
+  async function mergeBagIntoDepo(sourceId, targetId) {
+    if (busy) return console.warn(`${PREFIX} Inna operacja jest jeszcze wykonywana.`), false;
+    const src = readBagItems().find(v => String(v.id) === String(sourceId));
+    const dst = readDepoItems().find(v => String(v.id) === String(targetId));
+    if (!src || !dst) return console.error(`${PREFIX} Nie znaleziono stosu w torbie lub depozycie.`), false;
+    if (!sameStackTemplate(src.item, dst.item)) return console.warn(`${PREFIX} To nie są zgodne stosy.`), false;
+
+    busy = true;
+    const dstPos = {x: dst.x, y: dst.y};
+    const srcStart = {x: src.x, y: src.y};
+    console.group(`${PREFIX} TORBA → STOS W DEPO: ${src.name}`);
+    try {
+      // Stos docelowy chwilowo wyjmujemy do torby.
+      await request(`depo&get=${dst.id}`);
+      const dstBag = await waitFor(() => readBagItems().find(v => String(v.id) === String(dst.id)));
+      if (!dstBag) throw new Error("Nie udało się wyjąć docelowego stosu z depozytu.");
+
+      const srcBag = readBagItems().find(v => String(v.id) === String(src.id));
+      if (!srcBag) throw new Error("Stos źródłowy zniknął z torby.");
+
+      const srcAmount = Number(srcBag.amount);
+      const dstAmount = Number(dstBag.amount);
+
+      // Natywne łączenie w torbie: źródło kładziemy na slot stosu wyjętego z depo.
+      await request(`moveitem&st=0&id=${src.id}&x=${dstBag.x}&y=${dstBag.y}`);
+      await sleep(250);
+      await waitFor(() => {
+        const bag = readBagItems();
+        const a = bag.find(v => String(v.id) === String(src.id));
+        const b = bag.find(v => String(v.id) === String(dst.id));
+        return !a || !b || Number(a.amount) !== srcAmount || Number(b.amount) !== dstAmount;
+      }, 4000, 100);
+
+      const bagNow = readBagItems();
+      const srcAfter = bagNow.find(v => String(v.id) === String(src.id));
+      const dstAfter = bagNow.find(v => String(v.id) === String(dst.id));
+
+      if (srcAfter && dstAfter &&
+          Number(srcAfter.amount) === srcAmount && Number(dstAfter.amount) === dstAmount)
+        throw new Error("Natywne moveitem nie scaliło tych stosów.");
+
+      // Docelowy/ocalały stos wraca dokładnie na poprzednie miejsce w depozycie.
+      const result = dstAfter || srcAfter;
+      if (!result) throw new Error("Po scalaniu nie znaleziono wynikowego stosu w torbie.");
+      await request(`depo&put=${result.id}&x=${dstPos.x}&y=${dstPos.y}`);
+      const returned = await waitFor(() => readDepoItems().some(v => String(v.id) === String(result.id)), 5000);
+      if (!returned) throw new Error("Wynikowy stos nie wrócił do depozytu.");
+
+      // Jeżeli capacity zostało osiągnięte, reszta źródłowego stosu ma zostać w torbie.
+      // Niczego z nią nie robimy — to odpowiada gestowi „torba → depozyt”.
+      console.info(`${PREFIX} Gotowe. Wynik wrócił na slot ${dstPos.x},${dstPos.y}.`);
+      return true;
+    } catch (e) {
+      console.error(`${PREFIX} Operacja przerwana:`, e);
+      console.warn(`${PREFIX} Jeśli docelowy stos został w torbie, włóż go ręcznie do depozytu.`);
+      return false;
+    } finally {
+      busy = false;
+      console.groupEnd();
+    }
+  }
+
   // Native depozyt ma własny pointerDroppable na całej siatce. Zagnieżdżony
   // droppable na ikonie przedmiotu nie dostawał zdarzenia drop, dlatego v0.4.1
   // rozpoznaje gest na poziomie dokumentu, zanim siatka depozytu go przejmie.
@@ -226,11 +300,24 @@
     try { return window.jQuery(itemEl).data("item") || null; } catch { return null; }
   }
 
+  function bagItemFromElement(el) {
+    if (!window.jQuery || !el) return null;
+    const itemEl = el.closest?.(".inventory-item, .inventory-grid .item, .equipment-window .item");
+    if (!itemEl) return null;
+    try { return window.jQuery(itemEl).data("item") || null; } catch { return null; }
+  }
+
   function onMergePointerDown(event) {
     if (event.button !== 0) return;
-    const item = depoItemFromElement(event.target);
-    if (!isPrivateDepoItem(item) || !isStackItem(item)) return;
-    mergeDrag = { item, x: event.clientX, y: event.clientY };
+    const depoItem = depoItemFromElement(event.target);
+    if (isPrivateDepoItem(depoItem) && isStackItem(depoItem)) {
+      mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY };
+      return;
+    }
+    const bagItem = bagItemFromElement(event.target);
+    if (isBagStackItem(bagItem)) {
+      mergeDrag = { item: bagItem, origin: "bag", x: event.clientX, y: event.clientY };
+    }
   }
 
   function onMergePointerUp(event) {
@@ -243,13 +330,24 @@
     // elementFromPoint jest pewniejsze niż event.target przy helperze drag&drop.
     const under = document.elementFromPoint(event.clientX, event.clientY);
     const target = depoItemFromElement(under);
-    if (!sameStackKind(drag.item, target)) return;
+    if (!target || !isPrivateDepoItem(target)) return;
 
-    // Nie pozwalamy natywnemu gridowi wykonać zwykłego depo&move na zajęty slot.
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation?.();
-    mergeViaBag(drag.item.id, target.id);
+    if (drag.origin === "depo") {
+      if (!sameStackKind(drag.item, target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      mergeViaBag(drag.item.id, target.id);
+      return;
+    }
+
+    // Stos z torby upuszczony bezpośrednio na zgodny stos w depozycie.
+    if (drag.origin === "bag" && sameStackTemplate(drag.item, target)) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      mergeBagIntoDepo(drag.item.id, target.id);
+    }
   }
 
   function installMergeGesture() {
@@ -312,10 +410,10 @@
 
   function start(){
     installMergeGesture(); installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
-    console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM, a przeciągnięcie stosu na taki sam stos uruchamia scalanie przez torbę.`);
+    console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM. Scalanie działa depo→depo oraz torba→stos w depozycie.`);
   }
   function destroy(){observer?.disconnect();observer=null; document.removeEventListener("mousedown",onMergePointerDown,true);document.removeEventListener("mouseup",onMergePointerUp,true);delete document.documentElement.dataset.teriashDepoPlusMergeGesture;}
 
-  window.TeriashDepoPlus={version:VERSION,snapshot:printSnapshot,splitViaBag,mergeViaBag,items:()=>lastSnapshot.length?lastSnapshot:readDepoItems(),destroy};
+  window.TeriashDepoPlus={version:VERSION,snapshot:printSnapshot,splitViaBag,mergeViaBag,mergeBagIntoDepo,items:()=>lastSnapshot.length?lastSnapshot:readDepoItems(),destroy};
   start();
 })();

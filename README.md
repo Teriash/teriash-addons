@@ -151,3 +151,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Depozyt+ v0.4.1: przeciągnięcie jednego stosu na taki sam stos w prywatnym depozycie uruchamia scalanie. Wykrywanie dropu przeniesiono na poziom dokumentu, ponieważ natywna siatka depozytu przejmowała zdarzenie przed ikoną docelową.
 - Scalanie wykonuje w tle: depozyt → torba → natywne `moveitem` → depozyt.
 - Wynik wraca na pozycję stosu docelowego; nadmiar ponad `capacity` wraca na pozycję stosu źródłowego.
+
+
+### v1.3.5
+- Depozyt+ 0.5.0: przeciągnięcie zgodnego stosu z torby bezpośrednio na stos w prywatnym depozycie uruchamia natywne scalanie przez torbę; wynik wraca na slot docelowy, a nadmiar ponad capacity pozostaje w torbie.
