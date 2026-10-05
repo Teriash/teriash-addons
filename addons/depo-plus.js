@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.4.0";
+  const VERSION = "0.4.1";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -214,23 +214,49 @@
     }
   }
 
-  function installMergeDrop(el, targetItem) {
-    if (!window.jQuery || !isStackItem(targetItem)) return;
-    const $el = window.jQuery(el);
-    if ($el.data("teriash-depo-plus-merge-drop")) return;
-    $el.data("teriash-depo-plus-merge-drop", true);
-    if (typeof $el.pointerDroppable !== "function") return;
-    $el.pointerDroppable({
-      accept: ".item:not(.shop-item)",
-      drop: function(event, ui) {
-        const source = ui?.draggable?.data?.("item");
-        if (!sameStackKind(source, targetItem)) return;
-        event?.preventDefault?.();
-        event?.stopPropagation?.();
-        mergeViaBag(source.id, targetItem.id);
-        return false;
-      }
-    });
+  // Native depozyt ma własny pointerDroppable na całej siatce. Zagnieżdżony
+  // droppable na ikonie przedmiotu nie dostawał zdarzenia drop, dlatego v0.4.1
+  // rozpoznaje gest na poziomie dokumentu, zanim siatka depozytu go przejmie.
+  let mergeDrag = null;
+
+  function depoItemFromElement(el) {
+    if (!window.jQuery || !el) return null;
+    const itemEl = el.closest?.(".depo-window .item, .depo .item, .window-depo .item");
+    if (!itemEl) return null;
+    try { return window.jQuery(itemEl).data("item") || null; } catch { return null; }
+  }
+
+  function onMergePointerDown(event) {
+    if (event.button !== 0) return;
+    const item = depoItemFromElement(event.target);
+    if (!isPrivateDepoItem(item) || !isStackItem(item)) return;
+    mergeDrag = { item, x: event.clientX, y: event.clientY };
+  }
+
+  function onMergePointerUp(event) {
+    const drag = mergeDrag;
+    mergeDrag = null;
+    if (!drag || event.button !== 0) return;
+    const moved = Math.hypot(event.clientX - drag.x, event.clientY - drag.y);
+    if (moved < 8) return;
+
+    // elementFromPoint jest pewniejsze niż event.target przy helperze drag&drop.
+    const under = document.elementFromPoint(event.clientX, event.clientY);
+    const target = depoItemFromElement(under);
+    if (!sameStackKind(drag.item, target)) return;
+
+    // Nie pozwalamy natywnemu gridowi wykonać zwykłego depo&move na zajęty slot.
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+    mergeViaBag(drag.item.id, target.id);
+  }
+
+  function installMergeGesture() {
+    if (document.documentElement.dataset.teriashDepoPlusMergeGesture === "1") return;
+    document.documentElement.dataset.teriashDepoPlusMergeGesture = "1";
+    document.addEventListener("mousedown", onMergePointerDown, true);
+    document.addEventListener("mouseup", onMergePointerUp, true);
   }
 
   function askSplit(item) {
@@ -280,16 +306,15 @@
       try {
         const item = window.jQuery ? window.jQuery(el).data("item") : null;
         patchDepoItem(item);
-        if (isPrivateDepoItem(item) && isStackItem(item)) installMergeDrop(el, item);
       } catch {}
     });
   }
 
   function start(){
-    installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
+    installMergeGesture(); installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
     console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM, a przeciągnięcie stosu na taki sam stos uruchamia scalanie przez torbę.`);
   }
-  function destroy(){observer?.disconnect();observer=null;}
+  function destroy(){observer?.disconnect();observer=null; document.removeEventListener("mousedown",onMergePointerDown,true);document.removeEventListener("mouseup",onMergePointerUp,true);delete document.documentElement.dataset.teriashDepoPlusMergeGesture;}
 
   window.TeriashDepoPlus={version:VERSION,snapshot:printSnapshot,splitViaBag,mergeViaBag,items:()=>lastSnapshot.length?lastSnapshot:readDepoItems(),destroy};
   start();
