@@ -252,9 +252,20 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     return true;
   }
 
+  function isRelogging() {
+    // Margonem tworzy Engine.logOff na czas odliczania wylogowania/przelogowania.
+    // Dodatkowy request _g w tym stanie może anulować zmianę postaci, dlatego
+    // Clan Online pozostaje całkowicie cichy aż do zamknięcia okna LogOff.
+    if (page.Engine?.logOff) return true;
+
+    // Awaryjny fallback na wypadek zmiany implementacji klienta.
+    return !!document.querySelector(".log-off-wnd");
+  }
+
   function gameReadyForClanRequest() {
-    // Podczas przelogowania/zmiany postaci nie wysyłamy zapytań.
-    // Czekamy aż istnieje bohater, komunikacja i funkcja _g.
+    // Podczas przelogowania/wylogowania nie wysyłamy żadnych zapytań.
+    if (isRelogging()) return false;
+
     return !!(
       page.Engine?.hero?.d &&
       page.Engine?.communication &&
