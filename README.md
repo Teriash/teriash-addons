@@ -115,3 +115,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 ## v1.2.7
 - Klanowicze Online 1.1.7: automatyczne i ręczne pobieranie listy klanu jest całkowicie wstrzymywane podczas odliczania wylogowania/przelogowania (`Engine.logOff` / `.log-off-wnd`).
 - Zapobiega anulowaniu zmiany postaci przez okresowy request `clan&a=members`.
+
+
+## v1.2.8
+- Klanowicze Online 1.1.8: natywne menu gracza jest otwierane prawym przyciskiem myszy (PPM) zamiast lewym (LPM).

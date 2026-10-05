@@ -428,7 +428,7 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     }
 
     const e = {
-      type: "click",
+      type: "contextmenu",
       clientX: event.clientX,
       clientY: event.clientY,
       stopPropagation: () => event.stopPropagation(),
@@ -530,7 +530,7 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     e.stopPropagation();
   }, { passive: false });
 
-  clanList.addEventListener("click", e => {
+  clanList.addEventListener("contextmenu", e => {
     const row = e.target.closest(".taco-row[data-id]");
     if (!row || !clanList.contains(row)) return;
     const member = clanData.find(m => Number(m.id) === Number(row.dataset.id));
