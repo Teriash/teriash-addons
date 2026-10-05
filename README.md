@@ -56,10 +56,46 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Zmniejszone odstępy między outfitem, nickiem, poziomem i lokalizacją.
 - Mniejszy nagłówek i padding wierszy.
 
-
 ## v1.1.6
-- Klanowicze Online: kliknięcie lub PPM na klanowiczu otwiera natywne menu Margonem.
-- Dostępne są: wiadomość, ekwipunek, przyjaciele, wrogowie i zaproszenie do grupy.
-- Profil pojawia się, gdy klient zna `accountId` postaci (np. postać jest na tej samej mapie).
-- `clan&a=members` ma rekordy po 11 pól i nie zawiera `accountId`; ekwipunek działa bez niego, bo `ShowEqManager` pobiera dane po ID postaci.
-- Poprawiono wykrywanie widoku gry: loader rozpoznaje również gotowe `Engine.hero.d`, więc nie zależy wyłącznie od selektorów DOM.
+- Klanowicze Online: okno można dowolnie rozszerzać i zwężać, przeciągając prawy dolny róg.
+- Szerokość i wysokość okna są zapamiętywane po odświeżeniu gry.
+- Lista automatycznie dopasowuje się do ustawionej wysokości i dostaje przewijanie, gdy brakuje miejsca.
+
+## v1.1.7
+- Klanowicze Online: jeszcze mniejsze odstępy między outfitem, nickiem, poziomem i lokalizacją.
+- Paski przewijania są ciemne i dopasowane do stylistyki okna.
+
+## v1.1.8
+- Klanowicze Online: listę można przewijać kółkiem myszy po najechaniu na okno.
+- Scroll jest przechwytywany przez listę, więc nie powinien przewijać/zoomować elementów gry pod oknem.
+
+## v1.1.9
+- Klanowicze Online: zmniejszono minimalny dozwolony rozmiar okna.
+- Minimalna szerokość: 210 px.
+- Minimalna wysokość: 75 px.
+
+## v1.2.0
+- Usunięto zbędne komunikaty diagnostyczne z konsoli.
+- Klanowicze Online: naprawiono wielokrotne opakowywanie `Engine.communication.parseJSON`.
+- Dodano blokadę jednego aktywnego zapytania `clan&a=members` naraz.
+- Podczas przelogowania dodatek czeka na gotowy obiekt bohatera i komunikacji.
+- Automatyczne pobieranie listy jest ograniczone do jednego zapytania na 10 sekund.
+
+## v1.2.1
+- Klanowicze Online: dodano sortowanie listy.
+- Dostępne tryby: nazwa A-Z, nazwa Z-A, level rosnąco i level malejąco.
+- Wybrany sposób sortowania jest zapamiętywany.
+
+## v1.2.2
+- Naprawiono niewidoczną opcję sortowania w ustawieniach Klanowicze Online.
+- Panel ustawień dopasowuje wysokość do zawartości.
+- Na mniejszych ekranach panel ustawień można przewijać.
+
+## v1.2.3
+- Klanowicze Online: dodano mini widget do szybkiego otwierania i zamykania listy.
+- Widget można przeciągać, a jego pozycja jest zapamiętywana.
+- Zamknięcie głównego okna nie usuwa mini widgetu.
+
+## v1.2.4
+- Mini widget Klanowicze Online zmniejszony do 32x32 px, czyli rozmiaru widgetu TA.
+- Zmniejszono również ikonę i zaokrąglenie, aby zachować proporcje.

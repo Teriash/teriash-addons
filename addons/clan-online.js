@@ -60,7 +60,7 @@ background:#262c36;border-bottom:1px solid #444;cursor:move;user-select:none;tou
 #ta-clan-online .taco-list::-webkit-scrollbar-thumb{background:#596171;border:2px solid #1b1f26;border-radius:6px}
 #ta-clan-online .taco-list::-webkit-scrollbar-thumb:hover{background:#747e8d}
 #ta-clan-online .taco-list::-webkit-scrollbar-corner{background:#1b1f26}
-#ta-clan-online .taco-row{display:grid;align-items:center;gap:2px;padding:3px 5px;border-bottom:1px solid #2d323b;cursor:context-menu}
+#ta-clan-online .taco-row{display:grid;align-items:center;gap:2px;padding:3px 5px;border-bottom:1px solid #2d323b}
 #ta-clan-online .taco-row:last-child{border-bottom:0}
 #ta-clan-online .taco-outfit{width:32px;height:24px;background-repeat:no-repeat;background-position:0 0;flex:none;overflow:hidden}
 #ta-clan-online .taco-nick{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -399,80 +399,6 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     }).join("");
   }
 
-  function getNativeOtherById(id) {
-    try {
-      const others = page.Engine?.others;
-      if (!others) return null;
-      if (typeof others.getById === "function") return others.getById(Number(id)) || others.getById(String(id)) || null;
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
-  function getAccountIdForMember(member) {
-    const other = getNativeOtherById(member.id);
-    if (!other) return null;
-    try {
-      if (typeof other.getAccountId === "function") {
-        const id = Number(other.getAccountId());
-        if (Number.isFinite(id) && id > 0) return id;
-      }
-      const id = Number(other.d?.account ?? other.d?.accountId ?? other.account ?? other.accountId);
-      return Number.isFinite(id) && id > 0 ? id : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function openPlayerContextMenu(event, member) {
-    const Engine = page.Engine;
-    if (!Engine?.interface || !member) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const accountId = getAccountIdForMember(member);
-
-    // Jeżeli klient zna accountId gracza (np. postać jest na tej samej mapie),
-    // korzystamy wprost z natywnego generatora menu Margonem.
-    if (accountId && typeof Engine.others?.createOtherContextMenu === "function") {
-      Engine.others.createOtherContextMenu(event, {
-        charId: Number(member.id),
-        accountId,
-        lvl: Number(member.lvl),
-        nick: member.nick,
-        prof: member.prof
-      });
-      return;
-    }
-
-    // Pakiet clan&a=members nie zawiera accountId. Dla klanowicza spoza mapy
-    // budujemy natywne popup-menu z tych samych akcji, które nie wymagają accountId.
-    // Nadal używamy Engine.interface.showPopupMenu, więc wygląd i zachowanie są
-    // identyczne z menu Margonem.
-    const menu = [];
-    menu.push([_t("send_message", null, "chat"), () => {
-      Engine.chatController?.getChatInputWrapper?.().setPrivateMessageProcedure(member.nick);
-    }]);
-    menu.push([_t("invite_to_friend"), () => {
-      page._g?.("friends&a=finvite&nick=" + member.nick.trim().split(" ").join("_"));
-    }]);
-    menu.push([_t("add_to_enemies"), () => {
-      page._g?.("friends&a=eadd&nick=" + member.nick.trim().split(" ").join("_"));
-    }]);
-    menu.push([_t("team_invite", null, "menu"), () => {
-      page._g?.("party&a=inv&id=" + Number(member.id));
-    }]);
-
-    Engine.interface.showPopupMenu(menu, event, { header: member.nick });
-  }
-
-  function memberFromRow(row) {
-    const id = Number(row?.dataset?.id);
-    return clanData.find(m => Number(m.id) === id) || null;
-  }
-
   function syncSettings() {
     settingsBox.querySelectorAll("input[data-key]").forEach(i => {
       i.checked = !!settings[i.dataset.key];
@@ -498,14 +424,6 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
   }
 
   const clanList = box.querySelector(".taco-list");
-
-  clanList.addEventListener("contextmenu", e => {
-    const row = e.target.closest(".taco-row");
-    if (!row || !clanList.contains(row)) return;
-    const member = memberFromRow(row);
-    if (member) openPlayerContextMenu(e, member);
-  });
-
   clanList.addEventListener("wheel", e => {
     if (!e.deltaY) return;
     clanList.scrollTop += e.deltaY;
