@@ -155,3 +155,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 ### v1.3.5
 - Depozyt+ 0.5.0: przeciągnięcie zgodnego stosu z torby bezpośrednio na stos w prywatnym depozycie uruchamia natywne scalanie przez torbę; wynik wraca na slot docelowy, a nadmiar ponad capacity pozostaje w torbie.
+
+
+### v1.3.6
+- Depozyt+ 0.5.1: pełny stos (ilość >= capacity) nie przyjmuje kolejnego stosu. Drop jest przechwytywany i anulowany bez depo&put/depo&get, dzięki czemu przedmioty nie zamieniają się miejscami i nie trafiają do torby.

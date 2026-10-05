@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.5.0";
+  const VERSION = "0.5.1";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -226,12 +226,32 @@
     return a.name === b.name;
   }
 
+  function stackAmount(item) {
+    return Number(item?.getAmountStat?.() ?? item?._cachedStats?.amount ?? 0) || 0;
+  }
+
+  function stackCapacity(item) {
+    const raw = item?.getCapacityStat?.() ?? item?._cachedStats?.capacity;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  function targetStackIsFull(item) {
+    const capacity = stackCapacity(item);
+    return capacity > 0 && stackAmount(item) >= capacity;
+  }
+
+
   async function mergeBagIntoDepo(sourceId, targetId) {
     if (busy) return console.warn(`${PREFIX} Inna operacja jest jeszcze wykonywana.`), false;
     const src = readBagItems().find(v => String(v.id) === String(sourceId));
     const dst = readDepoItems().find(v => String(v.id) === String(targetId));
     if (!src || !dst) return console.error(`${PREFIX} Nie znaleziono stosu w torbie lub depozycie.`), false;
     if (!sameStackTemplate(src.item, dst.item)) return console.warn(`${PREFIX} To nie są zgodne stosy.`), false;
+    if (targetStackIsFull(dst.item)) {
+      console.info(`${PREFIX} Stos docelowy jest już pełny (${stackAmount(dst.item)}/${stackCapacity(dst.item)}). Operacja anulowana.`);
+      return false;
+    }
 
     busy = true;
     const dstPos = {x: dst.x, y: dst.y};
@@ -334,18 +354,29 @@
 
     if (drag.origin === "depo") {
       if (!sameStackKind(drag.item, target)) return;
+      // Zawsze przejmujemy drop na zgodny stos. Jeśli cel jest pełny, nic nie wysyłamy
+      // do gry — zapobiega to zamianie slotów albo wyjęciu obu stosów do torby.
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
+      if (targetStackIsFull(target)) {
+        console.info(`${PREFIX} Stos docelowy jest pełny (${stackAmount(target)}/${stackCapacity(target)}).`);
+        return;
+      }
       mergeViaBag(drag.item.id, target.id);
       return;
     }
 
     // Stos z torby upuszczony bezpośrednio na zgodny stos w depozycie.
     if (drag.origin === "bag" && sameStackTemplate(drag.item, target)) {
+      // Również dla pełnego stosu blokujemy natywny depo&put.
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
+      if (targetStackIsFull(target)) {
+        console.info(`${PREFIX} Stos docelowy jest pełny (${stackAmount(target)}/${stackCapacity(target)}).`);
+        return;
+      }
       mergeBagIntoDepo(drag.item.id, target.id);
     }
   }
@@ -410,7 +441,7 @@
 
   function start(){
     installMergeGesture(); installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
-    console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM. Scalanie działa depo→depo oraz torba→stos w depozycie.`);
+    console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM. Scalanie działa depo→depo oraz torba→stos w depozycie. Pełny stos docelowy jest blokowany bez wykonywania ruchu.`);
   }
   function destroy(){observer?.disconnect();observer=null; document.removeEventListener("mousedown",onMergePointerDown,true);document.removeEventListener("mouseup",onMergePointerUp,true);delete document.documentElement.dataset.teriashDepoPlusMergeGesture;}
 
