@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.3.1";
+  const VERSION = "0.4.0";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -137,6 +137,102 @@
     }
   }
 
+
+  function isStackItem(item) {
+    return !!item && Number(item.getAmountStat?.()) > 0;
+  }
+
+  function sameStackKind(a, b) {
+    if (!isPrivateDepoItem(a) || !isPrivateDepoItem(b) || String(a.id) === String(b.id)) return false;
+    if (!isStackItem(a) || !isStackItem(b)) return false;
+    if (a.tpl != null && b.tpl != null) return String(a.tpl) === String(b.tpl);
+    return a.name === b.name;
+  }
+
+  async function mergeViaBag(sourceId, targetId) {
+    if (busy) return console.warn(`${PREFIX} Inna operacja jest jeszcze wykonywana.`), false;
+    const items = readDepoItems();
+    const src = items.find(v => String(v.id) === String(sourceId));
+    const dst = items.find(v => String(v.id) === String(targetId));
+    if (!src || !dst) return console.error(`${PREFIX} Nie znaleziono obu stosów w depozycie.`), false;
+    if (!sameStackKind(src.item, dst.item)) return console.warn(`${PREFIX} Te przedmioty nie wyglądają na ten sam rodzaj stosu.`), false;
+    if (typeof window._g !== "function") return console.error(`${PREFIX} Brak _g.`), false;
+
+    busy = true;
+    const srcPos = {x: src.x, y: src.y};
+    const dstPos = {x: dst.x, y: dst.y};
+    console.group(`${PREFIX} SCALANIE ${src.name}`);
+    console.info(`Technicznie: oba stosy → torba → natywne moveitem → depozyt.`);
+    try {
+      await request(`depo&get=${dst.id}`);
+      const dstBag = await waitFor(() => readBagItems().find(v => String(v.id) === String(dst.id)));
+      if (!dstBag) throw new Error("Nie udało się wyjąć stosu docelowego do torby.");
+
+      await request(`depo&get=${src.id}`);
+      const srcBag = await waitFor(() => readBagItems().find(v => String(v.id) === String(src.id)));
+      if (!srcBag) throw new Error("Nie udało się wyjąć przeciąganego stosu do torby.");
+
+      // Dokładnie ten sam mechanizm, którego klient używa przy przeciągnięciu stosu na stos w torbie.
+      await request(`moveitem&st=0&id=${src.id}&x=${dstBag.x}&y=${dstBag.y}`);
+      await sleep(250);
+      await waitFor(() => {
+        const bag = readBagItems();
+        const a = bag.find(v => String(v.id) === String(src.id));
+        const b = bag.find(v => String(v.id) === String(dst.id));
+        return !a || !b || Number(a.amount) !== Number(src.amount) || Number(b.amount) !== Number(dst.amount);
+      }, 4000, 100);
+
+      const bagNow = readBagItems();
+      const srcAfter = bagNow.find(v => String(v.id) === String(src.id));
+      const dstAfter = bagNow.find(v => String(v.id) === String(dst.id));
+      if (srcAfter && dstAfter && Number(srcAfter.amount) === Number(src.amount) && Number(dstAfter.amount) === Number(dst.amount))
+        throw new Error("Natywne moveitem nie scaliło tych stosów.");
+
+      // Stos docelowy (albo jedyny ocalały) wraca w miejsce, na które upuszczono przedmiot.
+      if (dstAfter) {
+        await request(`depo&put=${dstAfter.id}&x=${dstPos.x}&y=${dstPos.y}`);
+        await waitFor(() => readDepoItems().some(v => String(v.id) === String(dstAfter.id)), 5000);
+      } else if (srcAfter) {
+        await request(`depo&put=${srcAfter.id}&x=${dstPos.x}&y=${dstPos.y}`);
+        await waitFor(() => readDepoItems().some(v => String(v.id) === String(srcAfter.id)), 5000);
+      }
+
+      // Przy przekroczeniu capacity część źródłowego stosu może zostać. Wraca na swoje stare miejsce.
+      if (srcAfter && dstAfter) {
+        await request(`depo&put=${srcAfter.id}&x=${srcPos.x}&y=${srcPos.y}`);
+        await waitFor(() => readDepoItems().some(v => String(v.id) === String(srcAfter.id)), 5000);
+      }
+
+      console.info(`${PREFIX} Scalanie zakończone.`);
+      return true;
+    } catch (e) {
+      console.error(`${PREFIX} Scalanie przerwane:`, e);
+      console.warn(`${PREFIX} Jeśli któryś stos pozostał w torbie, włóż go ręcznie do depozytu.`);
+      return false;
+    } finally {
+      busy = false; console.groupEnd();
+    }
+  }
+
+  function installMergeDrop(el, targetItem) {
+    if (!window.jQuery || !isStackItem(targetItem)) return;
+    const $el = window.jQuery(el);
+    if ($el.data("teriash-depo-plus-merge-drop")) return;
+    $el.data("teriash-depo-plus-merge-drop", true);
+    if (typeof $el.pointerDroppable !== "function") return;
+    $el.pointerDroppable({
+      accept: ".item:not(.shop-item)",
+      drop: function(event, ui) {
+        const source = ui?.draggable?.data?.("item");
+        if (!sameStackKind(source, targetItem)) return;
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+        mergeViaBag(source.id, targetItem.id);
+        return false;
+      }
+    });
+  }
+
   function askSplit(item) {
     const total = Number(item.getAmountStat?.());
     if (!Number.isFinite(total) || total <= 1 || String(item.getCansplitStat?.()) === "0") {
@@ -184,16 +280,17 @@
       try {
         const item = window.jQuery ? window.jQuery(el).data("item") : null;
         patchDepoItem(item);
+        if (isPrivateDepoItem(item) && isStackItem(item)) installMergeDrop(el, item);
       } catch {}
     });
   }
 
   function start(){
     installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
-    console.info(`${PREFIX} v${VERSION} uruchomiony. Opcja „Podziel” jest dodawana do natywnego menu PPM tylko dla podzielnych stosów w prywatnym depozycie.`);
+    console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM, a przeciągnięcie stosu na taki sam stos uruchamia scalanie przez torbę.`);
   }
   function destroy(){observer?.disconnect();observer=null;}
 
-  window.TeriashDepoPlus={version:VERSION,snapshot:printSnapshot,splitViaBag,items:()=>lastSnapshot.length?lastSnapshot:readDepoItems(),destroy};
+  window.TeriashDepoPlus={version:VERSION,snapshot:printSnapshot,splitViaBag,mergeViaBag,items:()=>lastSnapshot.length?lastSnapshot:readDepoItems(),destroy};
   start();
 })();
