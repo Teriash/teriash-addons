@@ -119,3 +119,12 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 ## v1.2.8
 - Klanowicze Online 1.1.8: natywne menu gracza jest otwierane prawym przyciskiem myszy (PPM) zamiast lewym (LPM).
+
+
+## v1.2.9
+
+- Dodano eksperymentalny moduł **Depozyt+ v0.1.0**.
+- Pierwszy etap jest diagnostyczny i dotyczy prywatnego depozytu.
+- `TeriashDepoPlus.snapshot()` pokazuje przedmioty depozytu wraz z ID, pozycją i danymi stosu.
+- Alt+PPM na przedmiocie depozytu wypisuje jego dane do konsoli.
+- Ta wersja celowo nie wysyła jeszcze eksperymentalnych żądań modyfikujących przedmioty.
