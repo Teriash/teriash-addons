@@ -8,6 +8,7 @@
   const POS = "teriashAddons.clanOnline.position";
   const SIZE = "teriashAddons.clanOnline.size";
   const WIDGET_POS = "teriashAddons.clanOnline.widgetPosition";
+  const PANEL_VISIBLE = "teriashAddons.clanOnline.panelVisible";
   const bridge = page.TeriashAddonsBridge || {};
   const getValue = bridge.getValue || ((k, d) => d);
   const setValue = bridge.setValue || (() => {});
@@ -568,8 +569,9 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     toggleSettings();
   });
 
-  function setPanelVisible(visible) {
+  function setPanelVisible(visible, persist = true) {
     box.style.display = visible ? "" : "none";
+    if (persist) setValue(PANEL_VISIBLE, !!visible);
     if (!visible) settingsBox.style.display = "none";
     widget.classList.toggle("ta-open", visible);
     widget.title = visible
@@ -712,8 +714,10 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
     originalParseJSON = null;
   }
 
-  render();
-  widget.classList.add("ta-open");
+  // Przy starcie respektujemy ostatni stan okna. Widget pozostaje dostępny,
+  // więc zamknięte okno nie otwiera się ponownie po F5/relogu.
+  const initialPanelVisible = getValue(PANEL_VISIBLE, true) !== false;
+  setPanelVisible(initialPanelVisible, false);
 
   // Engine może pojawić się chwilę po załadowaniu dodatku.
   let startupTries = 0;
