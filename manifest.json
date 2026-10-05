@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.2.9",
+  "suiteVersion": "1.3.0",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -40,8 +40,8 @@
     {
       "id": "depoPlus",
       "name": "Depozyt+",
-      "description": "Rozszerzone operacje w prywatnym depozycie (wersja diagnostyczna)",
-      "version": "0.1.0",
+      "description": "Rozszerzone operacje w prywatnym depozycie (test bezpośredniego podziału)",
+      "version": "0.2.0",
       "file": "addons/depo-plus.js",
       "defaultEnabled": false
     }

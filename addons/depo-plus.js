@@ -3,7 +3,7 @@
 
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.1.0";
+  const VERSION = "0.2.0";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -66,11 +66,60 @@
     });
   }
 
+
+  function splitTest(id, x, y, amount = 1) {
+    const item = readDepoItems().find(v => String(v.id) === String(id));
+    if (!item) {
+      console.error(`${PREFIX} Nie znaleziono przedmiotu ${id} w aktualnie otwartym prywatnym depozycie.`);
+      return false;
+    }
+
+    const max = Number(item.amount);
+    amount = Number(amount);
+    x = Number(x);
+    y = Number(y);
+    if (!Number.isInteger(amount) || amount < 1 || (Number.isFinite(max) && amount >= max)) {
+      console.error(`${PREFIX} Nieprawidłowa liczba do podziału. Stos ma ${item.amount} szt.`);
+      return false;
+    }
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0) {
+      console.error(`${PREFIX} Nieprawidłowy slot docelowy x/y.`);
+      return false;
+    }
+    if (String(item.cansplit) === "0") {
+      console.error(`${PREFIX} Ten przedmiot ma cansplit=0.`);
+      return false;
+    }
+    if (readDepoItems().some(v => String(v.id) !== String(item.id) && Number(v.x) === x && Number(v.y) === y)) {
+      console.error(`${PREFIX} Slot x=${x}, y=${y} jest zajęty. Do pierwszego testu wybierz pusty slot.`);
+      return false;
+    }
+    if (typeof window._g !== "function") {
+      console.error(`${PREFIX} Brak funkcji _g.`);
+      return false;
+    }
+
+    const request = `depo&move=${item.id}&x=${x}&y=${y}&split=${amount}`;
+    console.group(`${PREFIX} TEST PODZIAŁU`);
+    console.info("Przedmiot:", { id: item.id, name: item.name, amount: item.amount, from: {x:item.x,y:item.y}, to:{x,y}, split:amount });
+    console.info("Request:", request);
+    console.warn("Wysyłam dokładnie jeden eksperymentalny request. Przedmiot pozostaje w depozycie, jeśli serwer obsługuje tę operację.");
+    console.groupEnd();
+
+    window._g(request, response => {
+      console.group(`${PREFIX} ODPOWIEDŹ TESTU PODZIAŁU`);
+      console.log(response);
+      console.info("Po odpowiedzi wykonaj TeriashDepoPlus.snapshot(), aby sprawdzić stan depozytu.");
+      console.groupEnd();
+    });
+    return true;
+  }
+
   function start() {
     installMarker();
     observer = new MutationObserver(() => installMarker());
     observer.observe(document.documentElement, { childList: true, subtree: true });
-    console.info(`${PREFIX} v${VERSION} uruchomiony. Otwórz prywatny depozyt i użyj TeriashDepoPlus.snapshot(). Alt+PPM na przedmiocie pokaże jego dane.`);
+    console.info(`${PREFIX} v${VERSION} uruchomiony. snapshot() pokazuje przedmioty. Test: TeriashDepoPlus.splitTest(ID, X, Y, ILOSC).`);
   }
 
   function destroy() {
@@ -81,6 +130,7 @@
   window.TeriashDepoPlus = {
     version: VERSION,
     snapshot: printSnapshot,
+    splitTest,
     items: () => lastSnapshot.length ? lastSnapshot : readDepoItems(),
     destroy
   };

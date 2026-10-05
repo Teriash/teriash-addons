@@ -128,3 +128,8 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - `TeriashDepoPlus.snapshot()` pokazuje przedmioty depozytu wraz z ID, pozycją i danymi stosu.
 - Alt+PPM na przedmiocie depozytu wypisuje jego dane do konsoli.
 - Ta wersja celowo nie wysyła jeszcze eksperymentalnych żądań modyfikujących przedmioty.
+
+
+### v1.3.0
+- Depozyt+ 0.2.0: kontrolowany test bezpośredniego dzielenia stosu w prywatnym depozycie przez pojedynczy request `depo&move=...&split=...`.
+- `TeriashDepoPlus.splitTest(ID, X, Y, ILOSC)` waliduje przedmiot, ilość i pusty slot oraz loguje odpowiedź serwera.
