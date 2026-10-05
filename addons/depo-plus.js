@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.5.1";
+  const VERSION = "0.5.2";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -85,13 +85,12 @@
     return new Promise(resolve => window._g(q, r => resolve(r)));
   }
 
-  async function splitViaBag(id, amount) {
+  async function splitViaBag(id) {
     if (busy) return console.warn(`${PREFIX} Inna operacja jest jeszcze wykonywana.`), false;
     const src = readDepoItems().find(v => String(v.id) === String(id));
     if (!src) return console.error(`${PREFIX} Nie znaleziono przedmiotu w depozycie.`), false;
-    const total = Number(src.amount), split = Number(amount);
-    if (!Number.isInteger(split) || split < 1 || !Number.isFinite(total) || split >= total)
-      return console.error(`${PREFIX} Nieprawidłowa liczba. Stos ma ${src.amount} szt.`), false;
+    const total = Number(src.amount);
+    if (!Number.isFinite(total) || total <= 1) return false;
     if (String(src.cansplit) === "0") return console.error(`${PREFIX} Tego przedmiotu nie można dzielić.`), false;
     if (typeof window._g !== "function") return console.error(`${PREFIX} Brak _g.`), false;
 
@@ -101,17 +100,61 @@
     busy = true;
     const originalPos = {x: src.x, y: src.y};
     console.group(`${PREFIX} PODZIAŁ ${src.name}`);
-    console.info(`Dzielę ${src.amount} na ${total-split} + ${split}. Technicznie: depozyt → torba → podział → depozyt.`);
     try {
-      const bagBefore = new Set(readBagItems().map(v => String(v.id)));
-
       await request(`depo&get=${src.id}`);
       const inBag = await waitFor(() => readBagItems().find(v => String(v.id) === String(src.id)));
-      if (!inBag) throw new Error("Nie udało się wyjąć przedmiotu do torby (brak miejsca albo brak aktualizacji klienta).");
+      if (!inBag) throw new Error("Nie udało się wyjąć przedmiotu do torby.");
 
       const beforeSplit = new Set(readBagItems().map(v => String(v.id)));
-      const splitReq = `moveitem&findslot=1&st=0&id=${src.id}&x=${inBag.x}&y=${inBag.y}&split=${split}`;
-      await request(splitReq);
+      const originalG = window._g;
+      let resolveSent;
+      const sentPromise = new Promise(resolve => resolveSent = resolve);
+      let restored = false;
+      const restoreG = () => {
+        if (restored) return;
+        restored = true;
+        window._g = originalG;
+      };
+
+      window._g = function(task, cb, ...rest) {
+        if (typeof task === "string" &&
+            task.startsWith("moveitem") &&
+            task.includes(`id=${src.id}`) &&
+            task.includes("&split=")) {
+          restoreG();
+          const result = originalG.call(this, task, cb, ...rest);
+          resolveSent(true);
+          return result;
+        }
+        return originalG.call(this, task, cb, ...rest);
+      };
+
+      // Oryginalny mechanizm Margonem. Wyświetla natywne okno
+      // „Podziel przedmiot, maksymalna ilość: ...”.
+      Engine.heroEquipment.splitItem(inBag.item, inBag.x, inBag.y, true);
+
+      // Czekamy na zatwierdzenie albo zamknięcie natywnego okna.
+      let appeared = false;
+      const dialogClosed = (async () => {
+        const until = Date.now() + 60000;
+        while (Date.now() < until) {
+          const dlg = document.querySelector(".askAlert");
+          if (dlg) appeared = true;
+          if (appeared && !dlg) return false;
+          await sleep(100);
+        }
+        return false;
+      })();
+
+      const sent = await Promise.race([sentPromise, dialogClosed]);
+      restoreG();
+
+      if (!sent) {
+        // Anulowano: odkładamy niezmieniony stos z powrotem.
+        await request(`depo&put=${src.id}&x=${originalPos.x}&y=${originalPos.y}`);
+        await waitFor(() => readDepoItems().some(v => String(v.id) === String(src.id)), 5000);
+        return false;
+      }
 
       const newPart = await waitFor(() => {
         const now = readBagItems();
@@ -119,7 +162,6 @@
       });
       if (!newPart) throw new Error("Podział w torbie nie utworzył wykrywalnego nowego stosu.");
 
-      // Oryginał wraca dokładnie na swoje miejsce, wydzielona część do wolnego slotu tej samej zakładki.
       await request(`depo&put=${src.id}&x=${originalPos.x}&y=${originalPos.y}`);
       await waitFor(() => readDepoItems().some(v => String(v.id) === String(src.id)), 5000);
       await request(`depo&put=${newPart.id}&x=${freeDepo.x}&y=${freeDepo.y}`);
@@ -130,13 +172,13 @@
       return true;
     } catch (e) {
       console.error(`${PREFIX} Operacja przerwana:`, e);
-      console.warn(`${PREFIX} Jeśli przedmiot pozostał w torbie, włóż go ręcznie do depozytu. Dodatek nie będzie wysyłał kolejnych requestów po błędzie.`);
+      console.warn(`${PREFIX} Jeśli przedmiot pozostał w torbie, włóż go ręcznie do depozytu.`);
       return false;
     } finally {
-      busy = false; console.groupEnd();
+      busy = false;
+      console.groupEnd();
     }
   }
-
 
   function isStackItem(item) {
     return !!item && Number(item.getAmountStat?.()) > 0;
@@ -391,13 +433,10 @@
   function askSplit(item) {
     const total = Number(item.getAmountStat?.());
     if (!Number.isFinite(total) || total <= 1 || String(item.getCansplitStat?.()) === "0") {
-      window.mAlert ? window.mAlert("Tego przedmiotu nie można podzielić.") : alert("Tego przedmiotu nie można podzielić.");
+      window.mAlert ? window.mAlert("Tego przedmiotu nie można podzielić.") : console.warn(`${PREFIX} Tego przedmiotu nie można podzielić.`);
       return;
     }
-    const raw = prompt(`Podziel stos „${item.name}” (${total} szt.)\nIle sztuk wydzielić?`, "1");
-    if (raw == null) return;
-    const amount = Number(String(raw).replace(/\s/g, ""));
-    splitViaBag(item.id, amount);
+    splitViaBag(item.id);
   }
 
   function canSplitDepoItem(item) {
@@ -441,7 +480,7 @@
 
   function start(){
     installMergeGesture(); installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
-    console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM. Scalanie działa depo→depo oraz torba→stos w depozycie. Pełny stos docelowy jest blokowany bez wykonywania ruchu.`);
+    console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM. Scalanie działa depo→depo oraz torba→stos w depozycie. Pełny stos docelowy jest blokowany bez wykonywania ruchu. „Podziel” używa natywnego okna Margonem.`);
   }
   function destroy(){observer?.disconnect();observer=null; document.removeEventListener("mousedown",onMergePointerDown,true);document.removeEventListener("mouseup",onMergePointerUp,true);delete document.documentElement.dataset.teriashDepoPlusMergeGesture;}
 

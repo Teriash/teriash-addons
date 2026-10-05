@@ -159,3 +159,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 ### v1.3.6
 - Depozyt+ 0.5.1: pełny stos (ilość >= capacity) nie przyjmuje kolejnego stosu. Drop jest przechwytywany i anulowany bez depo&put/depo&get, dzięki czemu przedmioty nie zamieniają się miejscami i nie trafiają do torby.
+
+
+### v1.3.7
+- Depozyt+ 0.5.2: opcja Podziel korzysta z oryginalnego okna Margonem przez `Engine.heroEquipment.splitItem`, bez `window.prompt`. Anulowanie odkłada stos z powrotem do depozytu.
