@@ -424,6 +424,17 @@ border-radius:7px;color:#eee;font:12px Arial,sans-serif;box-shadow:0 4px 18px #0
       preventDefault: () => event.preventDefault()
     };
     Engine.interface.showPopupMenu(menu, e, { header: nick });
+
+    // Panel dodatku ma własny stacking context. Natywne menu Margonem jest
+    // tworzone poza nim, dlatego po utworzeniu podnosimy wyłącznie warstwę
+    // aktywnego popupu ponad okno Klanowicze Online.
+    requestAnimationFrame(() => {
+      document.querySelectorAll(".popup-menu-layer").forEach(layer => {
+        if (layer.querySelector(".popup-menu.show")) {
+          layer.style.setProperty("z-index", "2147483640", "important");
+        }
+      });
+    });
   }
 
   function render(message = "") {

@@ -106,3 +106,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 - Menu zawiera wiadomość, ekwipunek, zaproszenie do przyjaciół, dodanie do wrogów i zaproszenie do grupy.
 - Gdy `accountId` jest dostępne z `Engine.others` (gracz na tej samej mapie), menu zawiera również „Pokaż profil”.
 - Naprawiono składanie adresu outfitu tak, aby nie tworzyć podwójnego ukośnika po `/postacie/`.
+
+
+## v1.2.6
+- Klanowicze Online 1.1.6: natywne menu gracza jest podnoszone ponad okno dodatku, dzięki czemu nie jest przez nie zasłaniane.
