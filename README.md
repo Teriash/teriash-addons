@@ -182,4 +182,4 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 
 ### v1.4.2
-- Depozyt+ 0.6.2: SHIFT+drag nie zgaduje już pola z pozycji myszy. Margonem samo wylicza docelowe x/y; dodatek przechwytuje natywne `depo&move` dla gestu SHIFT, anuluje przesunięcie całego stosu i otwiera Podziel dla dokładnie tego slotu.
+- Depozyt+ 0.6.2: SHIFT+drag nie wylicza już pola z pikseli. Dodatek przechwytuje natywne `depo&move` i wykorzystuje x/y wyliczone przez Margonem, blokując zwykłe przesunięcie i otwierając Podziel. Podział z PPM pozostaje bez zmian.

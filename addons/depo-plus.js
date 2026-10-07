@@ -312,48 +312,6 @@
   // droppable na ikonie przedmiotu nie dostawał zdarzenia drop, dlatego v0.4.1
   // rozpoznaje gest na poziomie dokumentu, zanim siatka depozytu go przejmie.
   let mergeDrag = null;
-  let shiftSplitPending = null;
-  let shiftSplitTimer = null;
-
-  function armShiftSplit(item) {
-    shiftSplitPending = item ? {id: String(item.id), item} : null;
-    clearTimeout(shiftSplitTimer);
-    if (shiftSplitPending) {
-      shiftSplitTimer = setTimeout(() => { shiftSplitPending = null; }, 2500);
-    }
-  }
-
-  function installShiftSplitRequestInterceptor() {
-    if (window.__teriashDepoPlusShiftInterceptor) return;
-    const originalG = window._g;
-    if (typeof originalG !== "function") return;
-
-    window._g = function(task, cb, ...rest) {
-      const pending = shiftSplitPending;
-      if (pending && typeof task === "string") {
-        const m = task.match(/^depo&move=(\d+)&x=(\d+)&y=(\d+)/);
-        if (m && String(m[1]) === pending.id) {
-          shiftSplitPending = null;
-          clearTimeout(shiftSplitTimer);
-
-          const x = Number(m[2]), y = Number(m[3]);
-          const source = readDepoItems().find(v => String(v.id) === pending.id) || pending.item;
-          const occupied = readDepoItems().some(v =>
-            String(v.id) !== pending.id && Number(v.x) === x && Number(v.y) === y
-          );
-
-          // SHIFT+drag dzieli tylko na pusty, inny slot. Jeśli warunek nie pasuje,
-          // puszczamy natywny request bez zmian.
-          if (source && !occupied && !(Number(source.x) === x && Number(source.y) === y)) {
-            setTimeout(() => askSplit(source, {x, y}), 0);
-            return;
-          }
-        }
-      }
-      return originalG.call(this, task, cb, ...rest);
-    };
-    window.__teriashDepoPlusShiftInterceptor = true;
-  }
 
   function depoItemFromElement(el) {
     if (!window.jQuery || !el) return null;
@@ -373,12 +331,10 @@
     if (event.button !== 0) return;
     const depoItem = depoItemFromElement(event.target);
     if (isPrivateDepoItem(depoItem) && isStackItem(depoItem)) {
-      const shiftSplit = !!event.shiftKey &&
-        Number(depoItem.getAmountStat?.()) > 1 &&
-        String(depoItem.getCansplitStat?.()) !== "0";
-      mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY, shiftSplit };
-      if (shiftSplit) armShiftSplit(depoItem);
-      else armShiftSplit(null);
+      mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY, shiftSplit: !!event.shiftKey };
+      if (event.shiftKey && Number(depoItem.getAmountStat?.()) > 1 && String(depoItem.getCansplitStat?.()) !== "0") {
+        shiftNativeMove = { id: String(depoItem.id) };
+      }
       return;
     }
     const bagItem = bagItemFromElement(event.target);
@@ -390,8 +346,8 @@
   function onMergePointerUp(event) {
     const drag = mergeDrag;
     mergeDrag = null;
+    if (shiftNativeMove) setTimeout(() => { shiftNativeMove = null; }, 250);
     if (!drag || event.button !== 0) return;
-    if (!drag.shiftSplit) armShiftSplit(null);
     const moved = Math.hypot(event.clientX - drag.x, event.clientY - drag.y);
     if (moved < 8) return;
 
@@ -432,8 +388,46 @@
     }
   }
 
+  // SHIFT + drag: zamiast zgadywać slot z pikseli przechwytujemy natywne
+  // depo&move wygenerowane przez samą grę. Dzięki temu używamy dokładnie x/y,
+  // które Margonem wyliczyło dla miejsca upuszczenia.
+  let shiftNativeMove = null;
+
+  function installShiftSplitNativeMove() {
+    if (window.__teriashDepoShiftSplitHook) return;
+    window.__teriashDepoShiftSplitHook = true;
+
+    const originalG = window._g;
+    if (typeof originalG !== "function") return;
+
+    window._g = function(task, cb, ...rest) {
+      const pending = shiftNativeMove;
+      if (pending && typeof task === "string") {
+        const m = task.match(/^depo&move=(\d+)&x=(\d+)&y=(\d+)$/);
+        if (m && String(m[1]) === String(pending.id)) {
+          shiftNativeMove = null;
+          const source = readDepoItems().find(v => String(v.id) === String(pending.id));
+          if (source) {
+            const slot = {x: Number(m[2]), y: Number(m[3])};
+            const occupied = readDepoItems().some(v =>
+              String(v.id) !== String(source.id) &&
+              Number(v.x) === slot.x && Number(v.y) === slot.y
+            );
+            if (!occupied &&
+                !(Number(source.x) === slot.x && Number(source.y) === slot.y)) {
+              askSplit(source, slot);
+              if (typeof cb === "function") setTimeout(() => cb({}), 0);
+              return;
+            }
+          }
+        }
+      }
+      return originalG.call(this, task, cb, ...rest);
+    };
+  }
+
+
   function installMergeGesture() {
-    installShiftSplitRequestInterceptor();
     if (document.documentElement.dataset.teriashDepoPlusMergeGesture === "1") return;
     document.documentElement.dataset.teriashDepoPlusMergeGesture = "1";
     document.addEventListener("mousedown", onMergePointerDown, true);
@@ -521,7 +515,8 @@
   }
 
   function start(){
-    installMergeGesture(); installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
+    installShiftSplitNativeMove();
+  installMergeGesture(); installMarker(); observer=new MutationObserver(installMarker); observer.observe(document.documentElement,{childList:true,subtree:true});
     console.info(`${PREFIX} v${VERSION} uruchomiony. „Podziel” działa z PPM. Scalanie działa depo→depo oraz torba→stos w depozycie. Pełny stos docelowy jest blokowany bez wykonywania ruchu. „Podziel” używa natywnego okna Margonem.`);
   }
   function destroy(){observer?.disconnect();observer=null; document.removeEventListener("mousedown",onMergePointerDown,true);document.removeEventListener("mouseup",onMergePointerUp,true);delete document.documentElement.dataset.teriashDepoPlusMergeGesture;}
