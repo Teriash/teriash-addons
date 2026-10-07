@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.5.3";
+  const VERSION = "0.6.0";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -85,7 +85,7 @@
     return new Promise(resolve => window._g(q, r => resolve(r)));
   }
 
-  async function splitViaBag(id, splitAmount) {
+  async function splitViaBag(id, splitAmount, targetSlot = null) {
     if (busy) return console.warn(`${PREFIX} Inna operacja jest jeszcze wykonywana.`), false;
     const src = readDepoItems().find(v => String(v.id) === String(id));
     if (!src) return console.error(`${PREFIX} Nie znaleziono przedmiotu w depozycie.`), false;
@@ -96,8 +96,10 @@
     if (String(src.cansplit) === "0") return console.error(`${PREFIX} Tego przedmiotu nie można dzielić.`), false;
     if (typeof window._g !== "function") return console.error(`${PREFIX} Brak _g.`), false;
 
-    const freeDepo = findFreeDepoSlot(src.x, src.y);
+    const freeDepo = targetSlot || findFreeDepoSlot(src.x, src.y);
     if (!freeDepo) return console.error(`${PREFIX} Brak wolnego slotu na tej zakładce depozytu.`), false;
+    if (readDepoItems().some(v => Number(v.x) === Number(freeDepo.x) && Number(v.y) === Number(freeDepo.y)))
+      return console.warn(`${PREFIX} Wybrany slot docelowy nie jest pusty.`), false;
 
     busy = true;
     const originalPos = {x: src.x, y: src.y};
@@ -348,6 +350,27 @@
     // elementFromPoint jest pewniejsze niż event.target przy helperze drag&drop.
     const under = document.elementFromPoint(event.clientX, event.clientY);
     const target = depoItemFromElement(under);
+
+    // SHIFT + drag na pusty slot: podział jak w natywnej torbie.
+    if (drag.origin === "depo" && event.shiftKey && isStackItem(drag.item)) {
+      const grid = Engine.depo?.wnd?.$?.find?.(".grid-wrapper");
+      if (!grid?.length) return;
+      const rect = grid[0].getBoundingClientRect();
+      const zoom = Engine.zoomFactor || 1;
+      const col = Math.floor((event.clientX - rect.left) / (33 * zoom));
+      const row = Math.floor((event.clientY - rect.top) / (33 * zoom));
+      if (col < 0 || col >= 7 || row < 0) return;
+      const tab = Math.floor(Number(drag.item.x) / 7);
+      const slot = {x: tab * 7 + col, y: row};
+      const occupied = readDepoItems().some(v => Number(v.x) === slot.x && Number(v.y) === slot.y);
+      if (occupied) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      askSplit(drag.item, slot);
+      return;
+    }
+
     if (!target || !isPrivateDepoItem(target)) return;
 
     if (drag.origin === "depo") {
@@ -386,7 +409,7 @@
     document.addEventListener("mouseup", onMergePointerUp, true);
   }
 
-  function askSplit(item) {
+  function askSplit(item, targetSlot = null) {
     const total = Number(item.getAmountStat?.());
     if (!Number.isFinite(total) || total <= 1 || String(item.getCansplitStat?.()) === "0") {
       window.mAlert ? window.mAlert("Tego przedmiotu nie można podzielić.") : console.warn(`${PREFIX} Tego przedmiotu nie można podzielić.`);
@@ -405,7 +428,7 @@
         let value = Number(input?.val?.());
         if (!Number.isInteger(value) || value < 1 || value > max) return false;
         // Dopiero tutaj zaczyna się depo -> torba -> split -> depo.
-        setTimeout(() => splitViaBag(item.id, value), 0);
+        setTimeout(() => splitViaBag(item.id, value, targetSlot), 0);
         return true;
       }
     }, {
