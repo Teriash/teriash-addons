@@ -179,3 +179,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 ### v1.4.1
 - Depozyt+ 0.6.1: SHIFT jest zapamiętywany od początku przeciągania, docelowy slot jest liczony z faktycznego rozmiaru siatki, a natywny ruch całego stosu jest blokowany przed obsługą dropu.
+
+
+### v1.4.2
+- Depozyt+ 0.6.2: SHIFT+drag nie zgaduje już pola z pozycji myszy. Margonem samo wylicza docelowe x/y; dodatek przechwytuje natywne `depo&move` dla gestu SHIFT, anuluje przesunięcie całego stosu i otwiera Podziel dla dokładnie tego slotu.

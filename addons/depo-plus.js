@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.6.1";
+  const VERSION = "0.6.2";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -312,6 +312,48 @@
   // droppable na ikonie przedmiotu nie dostawał zdarzenia drop, dlatego v0.4.1
   // rozpoznaje gest na poziomie dokumentu, zanim siatka depozytu go przejmie.
   let mergeDrag = null;
+  let shiftSplitPending = null;
+  let shiftSplitTimer = null;
+
+  function armShiftSplit(item) {
+    shiftSplitPending = item ? {id: String(item.id), item} : null;
+    clearTimeout(shiftSplitTimer);
+    if (shiftSplitPending) {
+      shiftSplitTimer = setTimeout(() => { shiftSplitPending = null; }, 2500);
+    }
+  }
+
+  function installShiftSplitRequestInterceptor() {
+    if (window.__teriashDepoPlusShiftInterceptor) return;
+    const originalG = window._g;
+    if (typeof originalG !== "function") return;
+
+    window._g = function(task, cb, ...rest) {
+      const pending = shiftSplitPending;
+      if (pending && typeof task === "string") {
+        const m = task.match(/^depo&move=(\d+)&x=(\d+)&y=(\d+)/);
+        if (m && String(m[1]) === pending.id) {
+          shiftSplitPending = null;
+          clearTimeout(shiftSplitTimer);
+
+          const x = Number(m[2]), y = Number(m[3]);
+          const source = readDepoItems().find(v => String(v.id) === pending.id) || pending.item;
+          const occupied = readDepoItems().some(v =>
+            String(v.id) !== pending.id && Number(v.x) === x && Number(v.y) === y
+          );
+
+          // SHIFT+drag dzieli tylko na pusty, inny slot. Jeśli warunek nie pasuje,
+          // puszczamy natywny request bez zmian.
+          if (source && !occupied && !(Number(source.x) === x && Number(source.y) === y)) {
+            setTimeout(() => askSplit(source, {x, y}), 0);
+            return;
+          }
+        }
+      }
+      return originalG.call(this, task, cb, ...rest);
+    };
+    window.__teriashDepoPlusShiftInterceptor = true;
+  }
 
   function depoItemFromElement(el) {
     if (!window.jQuery || !el) return null;
@@ -331,7 +373,12 @@
     if (event.button !== 0) return;
     const depoItem = depoItemFromElement(event.target);
     if (isPrivateDepoItem(depoItem) && isStackItem(depoItem)) {
-      mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY, shiftSplit: !!event.shiftKey };
+      const shiftSplit = !!event.shiftKey &&
+        Number(depoItem.getAmountStat?.()) > 1 &&
+        String(depoItem.getCansplitStat?.()) !== "0";
+      mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY, shiftSplit };
+      if (shiftSplit) armShiftSplit(depoItem);
+      else armShiftSplit(null);
       return;
     }
     const bagItem = bagItemFromElement(event.target);
@@ -344,6 +391,7 @@
     const drag = mergeDrag;
     mergeDrag = null;
     if (!drag || event.button !== 0) return;
+    if (!drag.shiftSplit) armShiftSplit(null);
     const moved = Math.hypot(event.clientX - drag.x, event.clientY - drag.y);
     if (moved < 8) return;
 
@@ -351,41 +399,7 @@
     const under = document.elementFromPoint(event.clientX, event.clientY);
     const target = depoItemFromElement(under);
 
-    // SHIFT zapamiętujemy już przy mousedown. Dzięki temu gest nie ginie,
-    // jeśli klawisz zostanie puszczony odrobinę przed myszą.
-    if (drag.origin === "depo" && drag.shiftSplit && isStackItem(drag.item)) {
-      const grid = Engine.depo?.wnd?.$?.find?.(".grid-wrapper");
-      if (!grid?.length) return;
 
-      const rect = grid[0].getBoundingClientRect();
-      if (event.clientX < rect.left || event.clientX >= rect.right ||
-          event.clientY < rect.top || event.clientY >= rect.bottom) return;
-
-      // Wyliczamy slot z faktycznego rozmiaru natywnej siatki, a nie 33*zoom.
-      const col = Math.floor((event.clientX - rect.left) / (rect.width / 7));
-      const sourceTab = Math.floor(Number(drag.item.x) / 7);
-
-      // Wysokość komórki odpowiada szerokości komórki; zaokrąglenie chroni
-      // przed skalowaniem UI/przeglądarki.
-      const cell = rect.width / 7;
-      const row = Math.floor((event.clientY - rect.top) / cell);
-      if (col < 0 || col >= 7 || row < 0) return;
-
-      const slot = {x: sourceTab * 7 + col, y: row};
-      const occupied = readDepoItems().some(v =>
-        String(v.id) !== String(drag.item.id) &&
-        Number(v.x) === slot.x && Number(v.y) === slot.y
-      );
-      if (occupied || (Number(drag.item.x) === slot.x && Number(drag.item.y) === slot.y)) return;
-
-      // Najważniejsze: blokujemy natywny mouseup/drop w fazie capture,
-      // zanim depo zdąży wysłać depo&move i przesunąć cały stos.
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation?.();
-      askSplit(drag.item, slot);
-      return;
-    }
 
     if (!target || !isPrivateDepoItem(target)) return;
 
@@ -419,6 +433,7 @@
   }
 
   function installMergeGesture() {
+    installShiftSplitRequestInterceptor();
     if (document.documentElement.dataset.teriashDepoPlusMergeGesture === "1") return;
     document.documentElement.dataset.teriashDepoPlusMergeGesture = "1";
     document.addEventListener("mousedown", onMergePointerDown, true);
