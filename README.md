@@ -183,3 +183,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 ### v1.4.2
 - Depozyt+ 0.6.2: SHIFT+drag nie wylicza już pola z pikseli. Dodatek przechwytuje natywne `depo&move` i wykorzystuje x/y wyliczone przez Margonem, blokując zwykłe przesunięcie i otwierając Podziel. Podział z PPM pozostaje bez zmian.
+
+
+### v1.4.3
+- Depozyt+ 0.6.3: poprawka SHIFT+drag — do okna Podziel przekazywany jest teraz prawdziwy obiekt Item z metodami getAmountStat/getCansplitStat, zamiast snapshotu depozytu. Usuwa błędny komunikat „Tego przedmiotu nie można podzielić” dla podzielnych stosów.

@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.4.2",
+  "suiteVersion": "1.4.3",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -41,7 +41,7 @@
       "id": "depoPlus",
       "name": "Depozyt+",
       "description": "Rozszerzone operacje w prywatnym depozycie: dzielenie stosów przez torbę",
-      "version": "0.6.2",
+      "version": "0.6.3",
       "file": "addons/depo-plus.js",
       "defaultEnabled": false
     }

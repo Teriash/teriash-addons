@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.6.2";
+  const VERSION = "0.6.3";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -333,7 +333,7 @@
     if (isPrivateDepoItem(depoItem) && isStackItem(depoItem)) {
       mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY, shiftSplit: !!event.shiftKey };
       if (event.shiftKey && Number(depoItem.getAmountStat?.()) > 1 && String(depoItem.getCansplitStat?.()) !== "0") {
-        shiftNativeMove = { id: String(depoItem.id) };
+        shiftNativeMove = { id: String(depoItem.id), item: depoItem };
       }
       return;
     }
@@ -406,16 +406,17 @@
         const m = task.match(/^depo&move=(\d+)&x=(\d+)&y=(\d+)$/);
         if (m && String(m[1]) === String(pending.id)) {
           shiftNativeMove = null;
-          const source = readDepoItems().find(v => String(v.id) === String(pending.id));
-          if (source) {
+          const sourceState = readDepoItems().find(v => String(v.id) === String(pending.id));
+          const sourceItem = pending.item;
+          if (sourceState && sourceItem) {
             const slot = {x: Number(m[2]), y: Number(m[3])};
             const occupied = readDepoItems().some(v =>
-              String(v.id) !== String(source.id) &&
+              String(v.id) !== String(sourceState.id) &&
               Number(v.x) === slot.x && Number(v.y) === slot.y
             );
             if (!occupied &&
-                !(Number(source.x) === slot.x && Number(source.y) === slot.y)) {
-              askSplit(source, slot);
+                !(Number(sourceState.x) === slot.x && Number(sourceState.y) === slot.y)) {
+              askSplit(sourceItem, slot);
               if (typeof cb === "function") setTimeout(() => cb({}), 0);
               return;
             }
