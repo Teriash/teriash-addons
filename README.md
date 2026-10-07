@@ -175,3 +175,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 ### v1.4.0
 - Depozyt+ 0.6.0: SHIFT + przeciągnięcie podzielnego stosu na pusty slot w prywatnym depozycie otwiera natywne okno Podziel. Dopiero OK uruchamia automat, a wydzielona część wraca na wskazany slot.
+
+
+### v1.4.1
+- Depozyt+ 0.6.1: SHIFT jest zapamiętywany od początku przeciągania, docelowy slot jest liczony z faktycznego rozmiaru siatki, a natywny ruch całego stosu jest blokowany przed obsługą dropu.

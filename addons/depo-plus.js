@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.6.0";
+  const VERSION = "0.6.1";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -331,7 +331,7 @@
     if (event.button !== 0) return;
     const depoItem = depoItemFromElement(event.target);
     if (isPrivateDepoItem(depoItem) && isStackItem(depoItem)) {
-      mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY };
+      mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY, shiftSplit: !!event.shiftKey };
       return;
     }
     const bagItem = bagItemFromElement(event.target);
@@ -351,19 +351,35 @@
     const under = document.elementFromPoint(event.clientX, event.clientY);
     const target = depoItemFromElement(under);
 
-    // SHIFT + drag na pusty slot: podział jak w natywnej torbie.
-    if (drag.origin === "depo" && event.shiftKey && isStackItem(drag.item)) {
+    // SHIFT zapamiętujemy już przy mousedown. Dzięki temu gest nie ginie,
+    // jeśli klawisz zostanie puszczony odrobinę przed myszą.
+    if (drag.origin === "depo" && drag.shiftSplit && isStackItem(drag.item)) {
       const grid = Engine.depo?.wnd?.$?.find?.(".grid-wrapper");
       if (!grid?.length) return;
+
       const rect = grid[0].getBoundingClientRect();
-      const zoom = Engine.zoomFactor || 1;
-      const col = Math.floor((event.clientX - rect.left) / (33 * zoom));
-      const row = Math.floor((event.clientY - rect.top) / (33 * zoom));
+      if (event.clientX < rect.left || event.clientX >= rect.right ||
+          event.clientY < rect.top || event.clientY >= rect.bottom) return;
+
+      // Wyliczamy slot z faktycznego rozmiaru natywnej siatki, a nie 33*zoom.
+      const col = Math.floor((event.clientX - rect.left) / (rect.width / 7));
+      const sourceTab = Math.floor(Number(drag.item.x) / 7);
+
+      // Wysokość komórki odpowiada szerokości komórki; zaokrąglenie chroni
+      // przed skalowaniem UI/przeglądarki.
+      const cell = rect.width / 7;
+      const row = Math.floor((event.clientY - rect.top) / cell);
       if (col < 0 || col >= 7 || row < 0) return;
-      const tab = Math.floor(Number(drag.item.x) / 7);
-      const slot = {x: tab * 7 + col, y: row};
-      const occupied = readDepoItems().some(v => Number(v.x) === slot.x && Number(v.y) === slot.y);
-      if (occupied) return;
+
+      const slot = {x: sourceTab * 7 + col, y: row};
+      const occupied = readDepoItems().some(v =>
+        String(v.id) !== String(drag.item.id) &&
+        Number(v.x) === slot.x && Number(v.y) === slot.y
+      );
+      if (occupied || (Number(drag.item.x) === slot.x && Number(drag.item.y) === slot.y)) return;
+
+      // Najważniejsze: blokujemy natywny mouseup/drop w fazie capture,
+      // zanim depo zdąży wysłać depo&move i przesunąć cały stos.
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation?.();
