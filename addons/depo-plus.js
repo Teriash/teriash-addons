@@ -2,7 +2,7 @@
   "use strict";
   if (window.TeriashDepoPlus) return;
 
-  const VERSION = "0.6.3";
+  const VERSION = "0.6.4";
   const PREFIX = "[Teriash Depozyt+]";
   let observer = null;
   let lastSnapshot = [];
@@ -332,8 +332,12 @@
     const depoItem = depoItemFromElement(event.target);
     if (isPrivateDepoItem(depoItem) && isStackItem(depoItem)) {
       mergeDrag = { item: depoItem, origin: "depo", x: event.clientX, y: event.clientY, shiftSplit: !!event.shiftKey };
-      if (event.shiftKey && Number(depoItem.getAmountStat?.()) > 1 && String(depoItem.getCansplitStat?.()) !== "0") {
-        shiftNativeMove = { id: String(depoItem.id), item: depoItem };
+      if (event.shiftKey && Number(depoItem.getAmountStat?.()) > 1) {
+        shiftNativeMove = {
+          id: String(depoItem.id),
+          item: depoItem,
+          canSplit: String(depoItem.getCansplitStat?.()) !== "0"
+        };
       }
       return;
     }
@@ -416,7 +420,12 @@
             );
             if (!occupied &&
                 !(Number(sourceState.x) === slot.x && Number(sourceState.y) === slot.y)) {
-              askSplit(sourceItem, slot);
+              if (!pending.canSplit) {
+                if (typeof window.mAlert === "function") window.mAlert("Tego przedmiotu nie można podzielić.");
+                else console.warn(`${PREFIX} Tego przedmiotu nie można podzielić.`);
+              } else {
+                askSplit(sourceItem, slot);
+              }
               if (typeof cb === "function") setTimeout(() => cb({}), 0);
               return;
             }

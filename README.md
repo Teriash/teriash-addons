@@ -187,3 +187,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 ### v1.4.3
 - Depozyt+ 0.6.3: poprawka SHIFT+drag — do okna Podziel przekazywany jest teraz prawdziwy obiekt Item z metodami getAmountStat/getCansplitStat, zamiast snapshotu depozytu. Usuwa błędny komunikat „Tego przedmiotu nie można podzielić” dla podzielnych stosów.
+
+
+### v1.4.4
+- Depozyt+ 0.6.4: SHIFT+drag na stosie, którego nie można dzielić, nie przekłada już przedmiotu. Natywny ruch jest przechwytywany i wyświetlany jest margonemski komunikat „Tego przedmiotu nie można podzielić.”
