@@ -6,8 +6,8 @@
   const defaults={mode:"normal",width:650,height:430,selector:""};
   let config={...defaults,...(B.getValue(KEY,{})||{})};
   let panel=null,target=null,original=null,observer=null,interval=null,pickMode=false;
-  // No automatic selection of the entire combat scene: only a manually
-  // identified log panel may be resized.
+  let anchor=null;
+  // Only the native battle-controller is moved; the game background stays untouched.
   const selectors=[];
   const css=document.createElement("style");
   css.id="ta-battle-logs-css";
@@ -26,39 +26,48 @@
       background:#10272d;color:white;border:1px solid #32b5ad;padding:12px;border-radius:9px;pointer-events:none}
     .ta-bl-resizable{resize:both!important;min-width:320px!important;min-height:240px!important}
 
-    /* Resize the actual native combat UI, not the battle background. */
-    .battle-controller.ta-bl-active{
+    /* Detached from transformed/clipped game HUD into body. */
+    body>.battle-controller.ta-bl-active{
       position:fixed!important;z-index:999990!important;box-sizing:border-box!important;
       width:min(var(--ta-bl-width),calc(100vw - 24px))!important;
       height:var(--ta-bl-height)!important;max-width:none!important;max-height:none!important;
-      transform:none!important;overflow:visible!important;
+      margin:0!important;transform:none!important;overflow:visible!important;
+      display:block!important;
     }
-    .battle-controller.ta-bl-large{
+    body>.battle-controller.ta-bl-left{
+      left:12px!important;right:auto!important;top:12px!important;bottom:auto!important;
+      height:calc(100dvh - 24px)!important;
+    }
+    body>.battle-controller.ta-bl-large{
       left:50%!important;right:auto!important;top:auto!important;bottom:12px!important;
       transform:translateX(-50%)!important;
     }
-    .battle-controller.ta-bl-left{
-      left:12px!important;right:auto!important;top:12px!important;bottom:auto!important;
-      height:calc(100vh - 24px)!important;
-    }
-    .battle-controller.ta-bl-active>.battle-content{
-      position:relative!important;box-sizing:border-box!important;
+    body>.battle-controller.ta-bl-active>.battle-content{
+      position:absolute!important;inset:0!important;box-sizing:border-box!important;
       width:100%!important;height:100%!important;min-height:0!important;
-      max-width:none!important;max-height:none!important;
-      left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;
-      transform:none!important;
-    }
-    .battle-controller.ta-bl-active .battle-content>.left-column,
-    .battle-controller.ta-bl-active .battle-content>.right-column{
-      height:calc(100% - 76px)!important;max-height:none!important;min-height:0!important;
+      max-width:none!important;max-height:none!important;transform:none!important;
       overflow:hidden!important;
     }
-    .battle-controller.ta-bl-active .left-column>.scroll-wrapper,
-    .battle-controller.ta-bl-active .right-column>.scroll-wrapper{
-      height:100%!important;max-height:100%!important;
+    body>.battle-controller.ta-bl-active .battle-content>.left-column{
+      position:absolute!important;top:44px!important;bottom:57px!important;left:12px!important;
+      width:calc(62% - 18px)!important;height:auto!important;max-height:none!important;
+      overflow:hidden!important;
     }
-    .battle-controller.ta-bl-active .left-column .scroll-pane,
-    .battle-controller.ta-bl-active .right-column .scroll-pane{max-height:none!important;}
+    body>.battle-controller.ta-bl-active .battle-content>.right-column{
+      position:absolute!important;top:44px!important;bottom:57px!important;right:12px!important;left:auto!important;
+      width:calc(38% - 18px)!important;height:auto!important;max-height:none!important;
+      overflow:hidden!important;
+    }
+    body>.battle-controller.ta-bl-active .left-column>.scroll-wrapper,
+    body>.battle-controller.ta-bl-active .right-column>.scroll-wrapper{
+      position:relative!important;height:100%!important;max-height:100%!important;
+      overflow:hidden!important;
+    }
+    body>.battle-controller.ta-bl-active .battle-content>.buttons-wrapper{
+      position:absolute!important;bottom:8px!important;top:auto!important;
+    }
+    body>.battle-controller.ta-bl-active .left-column .scroll-pane,
+    body>.battle-controller.ta-bl-active .right-column .scroll-pane{max-height:none!important;}
   `;
   document.head.appendChild(css);
   function save(){B.setValue(KEY,config)}
@@ -69,14 +78,26 @@
     return content?.parentElement?.classList.contains('battle-controller') ? content.parentElement : null;
   }
   function restore(){
-    if(target&&original){target.style.cssText=original.cssText;target.classList.remove('ta-bl-active','ta-bl-left','ta-bl-large');}
-    target=null;original=null;
+    if(target){
+      target.classList.remove('ta-bl-active','ta-bl-left','ta-bl-large');
+      if(original)target.style.cssText=original.cssText;
+      if(anchor?.parentNode)anchor.parentNode.insertBefore(target,anchor);
+    }
+    anchor?.remove();anchor=null;target=null;original=null;
   }
   function apply(){
-    const found=findWindow();
-    if(found!==target){restore();if(found){target=found;original={cssText:found.style.cssText}}}
+    if(config.mode==='normal'){if(target)restore();return}
+    const found=target?.isConnected?target:findWindow();
+    if(found!==target){
+      restore();
+      if(found){
+        target=found;original={cssText:found.style.cssText};
+        anchor=document.createComment('Teriash battle panel origin');
+        found.parentNode.insertBefore(anchor,found);
+        document.body.appendChild(found);
+      }
+    }
     if(!target||!target.isConnected)return;
-    if(config.mode==='normal'){restore();return}
     target.classList.add('ta-bl-active');
     target.classList.toggle('ta-bl-left',config.mode==='left');
     target.classList.toggle('ta-bl-large',config.mode==='large');
@@ -118,7 +139,7 @@
   }
   function closeSettings(){panel?.remove();panel=null}
   function destroy(){closeSettings();restore();clearInterval(interval);observer?.disconnect();css.remove();delete window.TeriashBattleLogs}
-  // Periodic retry because battle windows are created/destroyed between fights.
+  // Retry when native battle windows are recreated between fights.
   interval=setInterval(()=>{if(config.mode!=="normal")apply()},900);
   window.TeriashBattleLogs={openSettings,closeSettings,destroy};
   if(config.mode!=="normal")apply();

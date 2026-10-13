@@ -202,3 +202,7 @@ Nie zmieniamy już sceny walki. Wybierz „Wskaż okno walki” i kliknij tekst 
 
 ### v1.5.2 — Logi Walki+
 Poprawione wykrywanie `.battle-controller > .battle-content`, skalowanie kontenera i obu kolumn. Nie trzeba ręcznie wskazywać okna.
+
+
+### v1.5.3 — Logi Walki+ 0.1.3
+Przenoszenie samego panelu walki do body podczas aktywnego trybu, aby ominąć transformacje i obcinanie przez rodziców HUD. Przy trybie oryginalnym panel wraca na swoje miejsce. Kolumny logów mają niezależnie rozciąganą wysokość. Wersja do testów w grze.
