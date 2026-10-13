@@ -209,3 +209,7 @@ Przenoszenie samego panelu walki do body podczas aktywnego trybu, aby ominąć t
 
 ### v1.5.4 — Logi Walki+
 Tryb lewy omija chat i paski HUD, a po wykryciu zakończenia walki przywraca natywny panel i próbuje uruchomić natywne zamknięcie. Układ eksperymentalny.
+
+
+### v1.5.5
+- Logi Walki+: domyślna szerokość trybu lewego 350 px, zakończona walka jest obsługiwana tylko raz; najpierw natywne zamknięcie, a w razie potrzeby ukrycie samego panelu.

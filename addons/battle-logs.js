@@ -3,10 +3,12 @@
   const TA=window.TeriashAddons, B=TA?.bridge;
   if(!B || window.TeriashBattleLogs) return;
   const KEY="teriashAddons.battleLogs.settings";
-  const defaults={mode:"normal",width:650,height:430,selector:""};
+  const defaults={mode:"normal",width:350,height:430,selector:""};
   let config={...defaults,...(B.getValue(KEY,{})||{})};
+  if(config.mode==="left" && config.width===650) {config.width=350;B.setValue(KEY,config)}
   let panel=null,target=null,original=null,observer=null,interval=null,pickMode=false;
   let anchor=null, closeTimer=null, closingForEnd=false;
+  const finishedControllers=new WeakSet();
   // Only the native battle-controller is moved; the game background stays untouched.
   const selectors=[];
   const css=document.createElement("style");
@@ -88,6 +90,7 @@
   function apply(){
     if(config.mode==='normal'){if(target)restore();return}
     const found=target?.isConnected?target:findWindow();
+    if(found && finishedControllers.has(found)) return;
     if(found!==target){
       restore();
       if(found){
@@ -113,7 +116,7 @@
     target.style.setProperty('--ta-bl-top',top+'px');
     target.style.setProperty('--ta-bl-bottom',bottom+'px');
     target.style.setProperty('--ta-bl-safe-height',Math.max(240,innerHeight-top-bottom)+'px');
-    target.style.setProperty('--ta-bl-width',Math.min(Math.max(320,config.width),safeWidth)+'px');
+    target.style.setProperty('--ta-bl-width',Math.min(Math.max(300,config.width),safeWidth)+'px');
     target.style.setProperty('--ta-bl-height',Math.min(Math.max(240,config.height),innerHeight-180)+'px');
   }
   function setMode(mode){config.mode=mode;save();restore();apply();render()}
@@ -131,7 +134,7 @@
         <option value="large" ${config.mode==="large"?"selected":""}>Powiększony</option>
         <option value="left" ${config.mode==="left"?"selected":""}>Panel po lewej</option>
       </select></div>
-      <div class="bl-row"><label>Szerokość (px)</label><input data-key="width" type="number" min="320" max="1400" value="${config.width}"></div>
+      <div class="bl-row"><label>Szerokość (px)</label><input data-key="width" type="number" min="300" max="1400" value="${config.width}"></div>
       <div class="bl-row"><label>Wysokość (px)</label><input data-key="height" type="number" min="240" max="1000" value="${config.height}" ${config.mode==="left"?"disabled":""}></div>
       <div class="bl-actions"><button data-act="apply">Zastosuj</button><button data-act="pick">Wskaż okno walki</button><button data-act="reset">Reset</button></div>
       <div class="bl-note">Panel omija czat, górny HUD i dolny pasek umiejętności. Po zakończeniu walki przywraca oryginalne osadzenie okna i zamyka je. Ustawienia zapisują się po F5.</div>`;
@@ -140,7 +143,7 @@
     panel.querySelector('[data-act="reset"]').onclick=()=>{config={...defaults};save();restore();render()};
     panel.querySelector('[data-act="apply"]').onclick=()=>{
       const w=Number(panel.querySelector('[data-key="width"]').value),h=Number(panel.querySelector('[data-key="height"]').value);
-      config.width=Math.max(320,Math.min(1400,w||650));
+      config.width=Math.max(300,Math.min(1400,w||350));
       config.height=Math.max(240,Math.min(1000,h||430));
       setMode(panel.querySelector('[data-key="mode"]').value);
     };
@@ -154,18 +157,32 @@
   // Restore native DOM placement before closing a finished fight. Moving the
   // controller outside its original parent can otherwise break game cleanup.
   function checkBattleEnd(){
-    if(!target || closingForEnd) return;
+    if(!target || closingForEnd || finishedControllers.has(target)) return;
     const end=target.querySelector('.battle-end-layer');
     if(!end || getComputedStyle(end).display==='none' || getComputedStyle(end).visibility==='hidden')return;
     if(!end.textContent?.trim())return;
     closingForEnd=true;
+    const native=target;
+    finishedControllers.add(native);
     closeTimer=setTimeout(()=>{
-      const native=target;
-      restore();
-      const close=native.querySelector('.close-battle-logs:not([style*="display: none"]),.close-battle-ground:not([style*="display: none"])');
-      if(close)close.click();
-      setTimeout(()=>{closingForEnd=false},1000);
-    },1500);
+      if(target===native) restore();
+      // First use Margonem's own close control after restoring the DOM.
+      const controls=[...native.querySelectorAll('.close-battle-logs,.close-battle-ground')];
+      const close=controls.find(el => {
+        const st=getComputedStyle(el);
+        return st.display!=='none' && st.visibility!=='hidden';
+      });
+      if(close) close.click();
+      // Native cleanup can be asynchronous; hide only the finished battle
+      // controller if it remains visible. Never touch the battle background.
+      setTimeout(()=>{
+        if(native.isConnected && native.querySelector('.battle-end-layer')){
+          const end=native.querySelector('.battle-end-layer');
+          if(end && getComputedStyle(end).display!=='none') native.style.setProperty('display','none','important');
+        }
+        closingForEnd=false;
+      },400);
+    },900);
   }
   // Retry when native battle windows are recreated between fights.
   interval=setInterval(()=>{if(config.mode!=="normal") {apply();checkBattleEnd()}},450);
