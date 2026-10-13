@@ -217,3 +217,9 @@ Tryb lewy omija chat i paski HUD, a po wykryciu zakończenia walki przywraca nat
 
 ## v1.5.6 — Logi Walki+
 Zmiana wyłącznie rozmiaru i wizualnego położenia oryginalnego panelu. Bez przenoszenia DOM, automatycznego zamykania, ukrywania i ingerencji w walkę.
+
+
+### v1.5.7 — Logi Walki+ 0.1.7
+- Korekta wewnętrznych kolumn logów przy zmniejszaniu panelu.
+- Po wykryciu końca walki przywrócenie natywnego układu (bez klikania lub ukrywania okna).
+- Zamykanie walki pozostaje obsługiwane przez Margonem.

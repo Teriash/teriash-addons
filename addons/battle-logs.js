@@ -6,7 +6,7 @@
   const defaults={mode:"normal",width:350,height:430,selector:""};
   let config={...defaults,...(B.getValue(KEY,{})||{})};
   if(config.mode==="left" && config.width===650) {config.width=350;B.setValue(KEY,config)}
-  let panel=null,target=null,original=null,interval=null;
+  let panel=null,target=null,original=null,interval=null,endedElement=null;
   const css=document.createElement('style');
   css.id='ta-battle-logs-css';
   css.textContent=`
@@ -18,12 +18,21 @@
     #ta-bl-settings input{width:90px;background:#091317;color:white;border:1px solid #397782;border-radius:5px;padding:6px}
     #ta-bl-settings .bl-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px}
     #ta-bl-settings .bl-note{font-size:11px;color:#9fb8c0;margin-top:12px;line-height:1.5}
-    .battle-controller.ta-bl-sized{box-sizing:border-box!important;max-width:none!important;max-height:none!important;transform-origin:top left!important;z-index:9999!important}
-    .battle-controller.ta-bl-sized>.battle-content{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;box-sizing:border-box!important}
-    .battle-controller.ta-bl-sized .battle-content>.left-column{height:calc(100% - 92px)!important;max-height:none!important}
-    .battle-controller.ta-bl-sized .battle-content>.right-column{height:calc(100% - 92px)!important;max-height:none!important}
+    /* Nie zmieniamy układu całej sceny, tylko oryginalny panel. */
+    .battle-controller.ta-bl-sized{box-sizing:border-box!important;max-width:none!important;max-height:none!important;z-index:9999!important}
+    .battle-controller.ta-bl-sized>.battle-content{box-sizing:border-box!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important}
+    .battle-controller.ta-bl-sized .battle-content>.left-column,
+    .battle-controller.ta-bl-sized .battle-content>.right-column{
+      box-sizing:border-box!important;top:32px!important;bottom:49px!important;
+      height:auto!important;max-height:none!important;overflow:hidden!important
+    }
     .battle-controller.ta-bl-sized .left-column>.scroll-wrapper,
-    .battle-controller.ta-bl-sized .right-column>.scroll-wrapper{height:100%!important;max-height:100%!important}
+    .battle-controller.ta-bl-sized .right-column>.scroll-wrapper{
+      height:100%!important;max-height:100%!important;overflow:hidden!important
+    }
+    .battle-controller.ta-bl-sized .battle-content>.buttons-wrapper{bottom:0!important}
+    .battle-controller.ta-bl-sized .battle-content>.time-wrapper{top:0!important}
+
   `;
   document.head.appendChild(css);
   function save(){B.setValue(KEY,config)}
@@ -37,32 +46,44 @@
       .map(el=>el.getBoundingClientRect()).filter(x=>x.width>100&&x.height>150&&x.left<innerWidth*.35);
     return matches.length?Math.max(...matches.map(x=>x.right)):Math.min(270,innerWidth*.2);
   }
+  function battleEnded(el){
+    const end=el.querySelector('.battle-end-layer');
+    return !!end && getComputedStyle(end).display!=='none' &&
+      getComputedStyle(end).visibility!=='hidden' &&
+      end.getClientRects().length>0;
+  }
   function apply(){
     if(config.mode==='normal'){restore();return}
     const found=findWindow();
+    if(found===endedElement){if(battleEnded(found))return;endedElement=null;}
     if(found!==target){restore();if(found){target=found;original=found.style.cssText}}
-    if(!target)return;
-    // Keep the native DOM parent and native event handlers untouched.
-    // Only override dimensions and a visual translation of the original panel.
-    target.classList.remove('ta-bl-sized');
-    target.style.cssText=original;
+    if(!target || !target.isConnected)return;
+    // Po zakończeniu walki oddajemy cały panel Margonem:
+    // gra sama obsługuje przycisk zamknięcia i otwieranie kolejnej walki.
+    if(battleEnded(target)){
+      endedElement=target;
+      restore();
+      return;
+    }
     const left=Math.max(12,Math.ceil(getChatRight()+12));
     const top=90,bottom=85;
-    const maxWidth=Math.max(300,innerWidth-left-20);
-    const width=Math.min(Math.max(300,Number(config.width)||350),maxWidth);
-    const height=config.mode==='left'?Math.max(240,innerHeight-top-bottom):Math.min(Math.max(240,Number(config.height)||430),Math.max(240,innerHeight-top-bottom));
+    const width=Math.min(Math.max(300,Number(config.width)||350),Math.max(300,innerWidth-left-20));
+    const height=config.mode==='left'
+      ?Math.max(240,innerHeight-top-bottom)
+      :Math.min(Math.max(240,Number(config.height)||430),Math.max(240,innerHeight-top-bottom));
+    // Zapamiętujemy aktualne współrzędne przed zmianą rozmiaru i transformacji.
+    target.classList.remove('ta-bl-sized');
+    target.style.cssText=original;
+    const base=target.getBoundingClientRect();
     target.classList.add('ta-bl-sized');
     target.style.setProperty('width',width+'px','important');
     target.style.setProperty('height',height+'px','important');
-    // Let native CSS compute position first, then translate from the rendered
-    // rectangle. Do not change position:fixed/absolute or append to body.
-    target.style.setProperty('transform','none','important');
-    const rect=target.getBoundingClientRect();
     const x=config.mode==='left'?left:Math.max(left,Math.round((innerWidth-width)/2));
     const y=config.mode==='left'?top:Math.max(top,innerHeight-height-bottom);
-    target.style.setProperty('transform',`translate(${Math.round(x-rect.left)}px, ${Math.round(y-rect.top)}px)`,'important');
+    // Oryginalny DOM i obsługa zdarzeń pozostają nietknięte.
+    target.style.setProperty('transform',`translate(${Math.round(x-base.left)}px, ${Math.round(y-base.top)}px)`,'important');
   }
-  function setMode(mode){config.mode=mode;save();restore();apply();render()}
+  function setMode(mode){config.mode=mode;save();endedElement=null;restore();apply();render()}
   function pick(){window.mAlert?.('Okno walki jest wykrywane automatycznie. Dodatek zmienia wyłącznie jego wymiary i położenie.')}
   function render(){
     if(!panel)return;
