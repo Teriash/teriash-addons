@@ -6,12 +6,9 @@
   const defaults={mode:"normal",width:650,height:430,selector:""};
   let config={...defaults,...(B.getValue(KEY,{})||{})};
   let panel=null,target=null,original=null,observer=null,interval=null,pickMode=false;
-  const selectors=[
-    ".battle-window", ".battle-window-wrapper", ".fight-window",
-    ".fight-window-wrapper", ".battle-interface", ".battle-wrapper",
-    ".fight-wrapper", ".battle-panel", ".fight-panel",
-    "[class*='battle-window']", "[class*='fight-window']"
-  ];
+  // No automatic selection of the entire combat scene: only a manually
+  // identified log panel may be resized.
+  const selectors=[];
   const css=document.createElement("style");
   css.id="ta-battle-logs-css";
   css.textContent=`
@@ -27,14 +24,14 @@
     #ta-bl-settings .bl-note{font-size:11px;color:#9fb8c0;margin-top:12px;line-height:1.5}
     #ta-bl-picker{position:fixed;z-index:2147483640;top:12px;left:50%;transform:translateX(-50%);
       background:#10272d;color:white;border:1px solid #32b5ad;padding:12px;border-radius:9px;pointer-events:none}
-    .ta-bl-resizable{resize:both!important;overflow:auto!important;min-width:320px!important;min-height:240px!important}
+    .ta-bl-resizable{resize:both!important;min-width:320px!important;min-height:240px!important}
   `;
   document.head.appendChild(css);
   function save(){B.setValue(KEY,config)}
   function isVisible(el){const r=el.getBoundingClientRect();return r.width>180&&r.height>120&&getComputedStyle(el).display!=="none"}
   function findWindow(){
     if(config.selector){try{const el=document.querySelector(config.selector);if(el&&isVisible(el))return el}catch{}}
-    for(const s of selectors){for(const el of document.querySelectorAll(s)){if(isVisible(el)&&!el.closest("#ta-bl-settings"))return el}}
+    // Never fall back to battle scene. Explicit selection is required.
     return null;
   }
   function restore(){
@@ -59,11 +56,13 @@
     imp("max-height","none");
     imp("transform","none");
     imp("margin","0");
+    imp("display","flex");
+    imp("flex-direction","column");
     if(config.mode==="left"){
       imp("left","12px");imp("top","12px");
       imp("width",Math.max(320,config.width)+"px");
       imp("height","calc(100vh - 24px)");
-      imp("overflow","auto");
+      imp("overflow","visible");
       target.classList.remove("ta-bl-resizable");
     }else{
       const x=Math.max(0,(innerWidth-config.width)/2);
@@ -77,13 +76,26 @@
   function selectTarget(e){
     if(!pickMode)return;
     e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
-    const el=e.target.closest("[class]")||e.target;
-    if(el.closest("#ta-bl-settings"))return;
-    const classes=Array.from(el.classList||[]).filter(x=>/battle|fight|combat|window|wnd/i.test(x));
-    const candidate=classes.length?el:el.closest("[class*='battle'],[class*='fight'],[class*='combat'],[class*='window'],[class*='wnd']")||el;
+    const x=e.clientX,y=e.clientY;
+    // Choose the compact parent surrounding the attack log, not the battle
+    // background. The chosen node must contain the clicked element.
+    const chain=[];
+    for(let n=e.target;n&&n!==document.body;n=n.parentElement){
+      if(!(n instanceof HTMLElement))continue;
+      const r=n.getBoundingClientRect();
+      if(r.width>=300&&r.width<=1000&&r.height>=160&&r.height<=650&&r.left<=x&&r.right>=x&&r.top<=y&&r.bottom>=y)
+        chain.push({el:n,area:r.width*r.height,rect:r});
+    }
+    const candidate=chain.sort((a,b)=>a.area-b.area).find(c=>c.rect.width>=390&&c.rect.height>=200)?.el;
+    if(!candidate){
+      document.getElementById("ta-bl-picker").textContent="Nie znaleziono panelu. Kliknij tekst ataków wewnątrz dolnego okna walki (Esc = anuluj).";
+      return;
+    }
     if(candidate.id)config.selector="#"+CSS.escape(candidate.id);
-    else if(candidate.classList.length)config.selector="."+CSS.escape(candidate.classList[0]);
-    else {alert("Nie udało się rozpoznać okna. Kliknij jego ramkę.");return}
+    else {
+      candidate.setAttribute("data-ta-battle-log-target","true");
+      config.selector="[data-ta-battle-log-target='true']";
+    }
     pickMode=false;document.getElementById("ta-bl-picker")?.remove();
     save();restore();apply();render();
   }
@@ -91,7 +103,7 @@
   function pick(){
     pickMode=true;closeSettings();
     const hint=document.createElement("div");hint.id="ta-bl-picker";
-    hint.textContent="Kliknij RAMKĘ okna walki, aby wskazać je dodatkom (Esc = anuluj)";
+    hint.textContent="Kliknij TEKST ATAKÓW wewnątrz dolnego panelu walki (Esc = anuluj)";
     document.body.appendChild(hint);
   }
   document.addEventListener("keydown",e=>{if(e.key==="Escape"&&pickMode){pickMode=false;document.getElementById("ta-bl-picker")?.remove()}});
@@ -107,7 +119,7 @@
       <div class="bl-row"><label>Szerokość (px)</label><input data-key="width" type="number" min="320" max="1400" value="${config.width}"></div>
       <div class="bl-row"><label>Wysokość (px)</label><input data-key="height" type="number" min="240" max="1000" value="${config.height}" ${config.mode==="left"?"disabled":""}></div>
       <div class="bl-actions"><button data-act="apply">Zastosuj</button><button data-act="pick">Wskaż okno walki</button><button data-act="reset">Reset</button></div>
-      <div class="bl-note">Jeśli okno nie zmienia rozmiaru, kliknij „Wskaż okno walki”, a następnie ramkę okna w grze. W trybie lewym wysokość dopasowuje się do ekranu. Ustawienia zapisują się po F5.</div>`;
+      <div class="bl-note">Kliknij „Wskaż okno walki”, a następnie tekst ataków w dolnym panelu. Nie wskazuj tła walki. W trybie lewym wysokość dopasowuje się do ekranu. Ustawienia zapisują się po F5.</div>`;
     panel.querySelector('[data-act="close"]').onclick=closeSettings;
     panel.querySelector('[data-act="pick"]').onclick=pick;
     panel.querySelector('[data-act="reset"]').onclick=()=>{config={...defaults};save();restore();render()};
