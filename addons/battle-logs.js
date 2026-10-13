@@ -6,7 +6,7 @@
   const defaults={mode:"normal",width:350,height:430,selector:""};
   let config={...defaults,...(B.getValue(KEY,{})||{})};
   if(config.mode==="left" && config.width===650) {config.width=350;B.setValue(KEY,config)}
-  let panel=null,target=null,original=null,interval=null,endedElement=null;
+  let panel=null,target=null,original=null,interval=null;
   const css=document.createElement('style');
   css.id='ta-battle-logs-css';
   css.textContent=`
@@ -55,35 +55,38 @@
   function apply(){
     if(config.mode==='normal'){restore();return}
     const found=findWindow();
-    if(found===endedElement){if(battleEnded(found))return;endedElement=null;}
+
     if(found!==target){restore();if(found){target=found;original=found.style.cssText}}
     if(!target || !target.isConnected)return;
     // Po zakończeniu walki oddajemy cały panel Margonem:
     // gra sama obsługuje przycisk zamknięcia i otwieranie kolejnej walki.
-    if(battleEnded(target)){
-      endedElement=target;
-      restore();
-      return;
-    }
+    if(battleEnded(target)) return;
     const left=Math.max(12,Math.ceil(getChatRight()+12));
     const top=90,bottom=85;
     const width=Math.min(Math.max(300,Number(config.width)||350),Math.max(300,innerWidth-left-20));
     const height=config.mode==='left'
       ?Math.max(240,innerHeight-top-bottom)
       :Math.min(Math.max(240,Number(config.height)||430),Math.max(240,innerHeight-top-bottom));
-    // Zapamiętujemy aktualne współrzędne przed zmianą rozmiaru i transformacji.
+    // Najpierw zmieniamy wymiary, a dopiero potem mierzymy faktyczną
+    // pozycję elementu. Poprzednio pomiar przed zmianą rozmiaru powodował
+    // uciekanie okna (natywne centrowanie Margonem).
     target.classList.remove('ta-bl-sized');
     target.style.cssText=original;
-    const base=target.getBoundingClientRect();
     target.classList.add('ta-bl-sized');
     target.style.setProperty('width',width+'px','important');
     target.style.setProperty('height',height+'px','important');
+    // CSS translate jest niezależne od natywnego transform Margonem.
+    target.style.removeProperty('translate');
+    const base=target.getBoundingClientRect();
     const x=config.mode==='left'?left:Math.max(left,Math.round((innerWidth-width)/2));
     const y=config.mode==='left'?top:Math.max(top,innerHeight-height-bottom);
-    // Oryginalny DOM i obsługa zdarzeń pozostają nietknięte.
-    target.style.setProperty('transform',`translate(${Math.round(x-base.left)}px, ${Math.round(y-base.top)}px)`,'important');
+    target.style.setProperty('translate',
+      `${Math.round(x-base.left)}px ${Math.round(y-base.top)}px`,'important');
+    // Rodzic może przycinać panel. W takim wypadku nie wymuszamy
+    // ryzykownego przesuwania DOM ani ingerencji w mechanikę walki.
+
   }
-  function setMode(mode){config.mode=mode;save();endedElement=null;restore();apply();render()}
+  function setMode(mode){config.mode=mode;save();restore();apply();render()}
   function pick(){window.mAlert?.('Okno walki jest wykrywane automatycznie. Dodatek zmienia wyłącznie jego wymiary i położenie.')}
   function render(){
     if(!panel)return;
