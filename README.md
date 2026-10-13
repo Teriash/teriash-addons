@@ -191,3 +191,7 @@ Klanowicze Online v1.0.1: moduł sam wywołuje natywne `_g("clan&a=members")`, w
 
 ### v1.4.4
 - Depozyt+ 0.6.4: SHIFT+drag na stosie, którego nie można dzielić, nie przekłada już przedmiotu. Natywny ruch jest przechwytywany i wyświetlany jest margonemski komunikat „Tego przedmiotu nie można podzielić.”
+
+
+## Logi Walki+ (v1.5.0)
+W panelu TA włącz moduł Logi Walki+, kliknij koło zębate i wybierz Powiększony lub Panel po lewej. Jeśli automatyczne rozpoznanie okna nie działa, użyj „Wskaż okno walki” i kliknij jego ramkę. Tryb eksperymentalny: zależy od struktury aktualnego interfejsu Margonem.

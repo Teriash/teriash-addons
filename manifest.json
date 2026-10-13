@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.4.4",
+  "suiteVersion": "1.5.0",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -44,6 +44,16 @@
       "version": "0.6.4",
       "file": "addons/depo-plus.js",
       "defaultEnabled": false
+    },
+    {
+      "id": "battleLogs",
+      "name": "Logi Walki+",
+      "description": "Powiększone okno walki lub pionowy panel po lewej stronie",
+      "version": "0.1.0",
+      "file": "addons/battle-logs.js",
+      "defaultEnabled": false,
+      "settingsGlobal": "TeriashBattleLogs",
+      "settingsMethod": "openSettings"
     }
   ]
 }
