@@ -6,7 +6,7 @@
   const defaults={mode:"normal",width:650,height:430,selector:""};
   let config={...defaults,...(B.getValue(KEY,{})||{})};
   let panel=null,target=null,original=null,observer=null,interval=null,pickMode=false;
-  let anchor=null;
+  let anchor=null, closeTimer=null, closingForEnd=false;
   // Only the native battle-controller is moved; the game background stays untouched.
   const selectors=[];
   const css=document.createElement("style");
@@ -35,12 +35,12 @@
       display:block!important;
     }
     body>.battle-controller.ta-bl-left{
-      left:12px!important;right:auto!important;top:12px!important;bottom:auto!important;
-      height:calc(100dvh - 24px)!important;
+      left:var(--ta-bl-left,280px)!important;right:auto!important;top:var(--ta-bl-top,90px)!important;bottom:auto!important;
+      height:var(--ta-bl-safe-height,calc(100dvh - 180px))!important;
     }
     body>.battle-controller.ta-bl-large{
-      left:50%!important;right:auto!important;top:auto!important;bottom:12px!important;
-      transform:translateX(-50%)!important;
+      left:var(--ta-bl-left,280px)!important;right:auto!important;top:auto!important;bottom:var(--ta-bl-bottom,75px)!important;
+      transform:none!important;
     }
     body>.battle-controller.ta-bl-active>.battle-content{
       position:absolute!important;inset:0!important;box-sizing:border-box!important;
@@ -101,8 +101,20 @@
     target.classList.add('ta-bl-active');
     target.classList.toggle('ta-bl-left',config.mode==='left');
     target.classList.toggle('ta-bl-large',config.mode==='large');
-    target.style.setProperty('--ta-bl-width',Math.max(320,config.width)+'px');
-    target.style.setProperty('--ta-bl-height',Math.max(240,config.height)+'px');
+    // Preserve left HUD/chat, top game bar and bottom skill bar.
+    const chat = [...document.querySelectorAll('.chat-window,.chat-wrapper,[class*="chat-window"],[class*="chat-panel"]')]
+      .filter(el => !target.contains(el) && el.getBoundingClientRect().height > 150)
+      .map(el => el.getBoundingClientRect()).filter(r => r.left < innerWidth * .4);
+    const chatRight = chat.length ? Math.max(...chat.map(r => r.right)) : Math.min(285,innerWidth*.2);
+    const left = Math.max(12,Math.ceil(chatRight+12));
+    const top = 90, bottom = 90;
+    const safeWidth = Math.max(250,innerWidth-left-260);
+    target.style.setProperty('--ta-bl-left',left+'px');
+    target.style.setProperty('--ta-bl-top',top+'px');
+    target.style.setProperty('--ta-bl-bottom',bottom+'px');
+    target.style.setProperty('--ta-bl-safe-height',Math.max(240,innerHeight-top-bottom)+'px');
+    target.style.setProperty('--ta-bl-width',Math.min(Math.max(320,config.width),safeWidth)+'px');
+    target.style.setProperty('--ta-bl-height',Math.min(Math.max(240,config.height),innerHeight-180)+'px');
   }
   function setMode(mode){config.mode=mode;save();restore();apply();render()}
   // No manual picker needed: stable semantic classes identify the panel.
@@ -122,7 +134,7 @@
       <div class="bl-row"><label>Szerokość (px)</label><input data-key="width" type="number" min="320" max="1400" value="${config.width}"></div>
       <div class="bl-row"><label>Wysokość (px)</label><input data-key="height" type="number" min="240" max="1000" value="${config.height}" ${config.mode==="left"?"disabled":""}></div>
       <div class="bl-actions"><button data-act="apply">Zastosuj</button><button data-act="pick">Wskaż okno walki</button><button data-act="reset">Reset</button></div>
-      <div class="bl-note">Panel logów wykrywany jest automatycznie na podstawie battle-controller i battle-content. W trybie lewym wysokość dopasowuje się do ekranu. Ustawienia zapisują się po F5.</div>`;
+      <div class="bl-note">Panel omija czat, górny HUD i dolny pasek umiejętności. Po zakończeniu walki przywraca oryginalne osadzenie okna i zamyka je. Ustawienia zapisują się po F5.</div>`;
     panel.querySelector('[data-act="close"]').onclick=closeSettings;
     panel.querySelector('[data-act="pick"]').onclick=pick;
     panel.querySelector('[data-act="reset"]').onclick=()=>{config={...defaults};save();restore();render()};
@@ -138,9 +150,25 @@
     panel=document.createElement("div");panel.id="ta-bl-settings";document.body.appendChild(panel);render();
   }
   function closeSettings(){panel?.remove();panel=null}
-  function destroy(){closeSettings();restore();clearInterval(interval);observer?.disconnect();css.remove();delete window.TeriashBattleLogs}
+  function destroy(){closeSettings();restore();clearInterval(interval);clearTimeout(closeTimer);observer?.disconnect();css.remove();delete window.TeriashBattleLogs}
+  // Restore native DOM placement before closing a finished fight. Moving the
+  // controller outside its original parent can otherwise break game cleanup.
+  function checkBattleEnd(){
+    if(!target || closingForEnd) return;
+    const end=target.querySelector('.battle-end-layer');
+    if(!end || getComputedStyle(end).display==='none' || getComputedStyle(end).visibility==='hidden')return;
+    if(!end.textContent?.trim())return;
+    closingForEnd=true;
+    closeTimer=setTimeout(()=>{
+      const native=target;
+      restore();
+      const close=native.querySelector('.close-battle-logs:not([style*="display: none"]),.close-battle-ground:not([style*="display: none"])');
+      if(close)close.click();
+      setTimeout(()=>{closingForEnd=false},1000);
+    },1500);
+  }
   // Retry when native battle windows are recreated between fights.
-  interval=setInterval(()=>{if(config.mode!=="normal")apply()},900);
+  interval=setInterval(()=>{if(config.mode!=="normal") {apply();checkBattleEnd()}},450);
   window.TeriashBattleLogs={openSettings,closeSettings,destroy};
   if(config.mode!=="normal")apply();
 })();

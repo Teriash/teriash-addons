@@ -206,3 +206,6 @@ Poprawione wykrywanie `.battle-controller > .battle-content`, skalowanie kontene
 
 ### v1.5.3 — Logi Walki+ 0.1.3
 Przenoszenie samego panelu walki do body podczas aktywnego trybu, aby ominąć transformacje i obcinanie przez rodziców HUD. Przy trybie oryginalnym panel wraca na swoje miejsce. Kolumny logów mają niezależnie rozciąganą wysokość. Wersja do testów w grze.
+
+### v1.5.4 — Logi Walki+
+Tryb lewy omija chat i paski HUD, a po wykryciu zakończenia walki przywraca natywny panel i próbuje uruchomić natywne zamknięcie. Układ eksperymentalny.
