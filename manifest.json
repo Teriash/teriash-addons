@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.5.5",
+  "suiteVersion": "1.5.6",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -49,7 +49,7 @@
       "id": "battleLogs",
       "name": "Logi Walki+",
       "description": "Powiększone okno walki lub pionowy panel po lewej stronie",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "file": "addons/battle-logs.js",
       "defaultEnabled": false,
       "settingsGlobal": "TeriashBattleLogs",
