@@ -198,3 +198,7 @@ W panelu TA włącz moduł Logi Walki+, kliknij koło zębate i wybierz Powięks
 
 ### v1.5.1 — Logi Walki+
 Nie zmieniamy już sceny walki. Wybierz „Wskaż okno walki” i kliknij tekst ataków wewnątrz dolnego panelu. Panel jest wybierany po rozmiarze elementu DOM. Po odświeżeniu gry może być potrzebne ponowne wskazanie.
+
+
+### v1.5.2 — Logi Walki+
+Poprawione wykrywanie `.battle-controller > .battle-content`, skalowanie kontenera i obu kolumn. Nie trzeba ręcznie wskazywać okna.
