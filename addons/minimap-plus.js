@@ -109,7 +109,7 @@
     const players=safeDrawable(e?.others).filter(o=>o?.isPlayer===true&&o?.d&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)))
       .map(o=>({...coord(o),id:o.d.id}));
     const all=safeDrawable(e?.npcs).filter(o=>o?.d&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)));
-    const npcs=[],objects=[],monsters=[];
+    const npcs=[],objects=[],monsters=[],recovery=[];
     for(const o of all){
       const d=o.d,p=coord(o);if(!p)continue;
       let kind="";
@@ -117,20 +117,30 @@
       // Nie filtruj po lvl: niektore prawdziwe potwory (np. Krabik) maja lvl=0.
       if(kind.includes("monster")||kind.includes("elite")||kind.includes("hero")||kind.includes("titan")){
         p.lvl=Number(d.lvl)||0;p.kind=kind;monsters.push(p);
+      }else if(kind==="recovery" && Number(d.type)===7){
+        // Rosliny i inne przedmioty odradzajace sie sa obiektami NPC typu 7.
+        recovery.push({...p,id:d.id,source:"recovery",rarity:"normal"});
       }else if(kind==="npcs"){
         if(Number(d.type)===5)objects.push(p);
         else if(Number(d.type)===0)npcs.push(p);
       }
     }
-    const items=safeGroundItems(e).filter(o=>o?.d &&
+    const droppedItems=safeGroundItems(e).filter(o=>o?.d &&
       (o.canvasObjectType==="M_ITEM" || o.getCanvasObjectType?.()==="M_ITEM"))
       .map(o=>{
         const p=coord(o);if(!p)return null;
         const tipClass=typeof o.tip?.[2]==="string"?o.tip[2].toLowerCase():"";
         const rarity=tipClass.includes("leg")?"legendary":tipClass.includes("her")?"heroic":
           tipClass.includes("uni")?"unique":"normal";
-        return {...p,rarity,id:o.d.id};
+        return {...p,rarity,id:o.d.id,source:"dropped",name:o.i?.name||p.name||"Przedmiot"};
       }).filter(Boolean);
+    // Unikaj podwojnych znacznikow, gdy ten sam przedmiot trafi do obu zrodel.
+    const items=[],seenItems=new Set();
+    for(const item of [...recovery,...droppedItems]){
+      const key=`${item.x}:${item.y}:${item.id??item.name??""}`;
+      if(seenItems.has(key))continue;
+      seenItems.add(key);items.push(item);
+    }
     let gates=[];
     try{gates=e?.map?.getGateways?.()?.getList?.()||[]}catch{}
     gates=Array.isArray(gates)?gates.map(coord).filter(Boolean):[];
@@ -177,7 +187,7 @@
       mark(v,color,3.2);
     }
     if(cfg.items!==false)for(const v of m.items){
-      const color=v.rarity==='legendary'?'#ffd15a':v.rarity==='heroic'?'#58d7ff':v.rarity==='unique'?'#ff9b48':'#f1f5f9';
+      const color=v.source==='recovery'?'#f3a74c':v.rarity==='legendary'?'#ffd15a':v.rarity==='heroic'?'#58d7ff':v.rarity==='unique'?'#ff9b48':'#f1f5f9';
       mark(v,color,3);
     }
     if(cfg.players)for(const v of m.players)mark(v,'#63caff',3.5);
@@ -226,7 +236,7 @@
       <label>Gracze (niebieskie kwadraty)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
       <label>NPC (zielone kwadraty)<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
       <label>Potwory (czerwone kwadraty)<input type="checkbox" data-k="monsters" ${cfg.monsters!==false?"checked":""}></label>
-      <label>Przedmioty (kolor wg rzadkości)<input type="checkbox" data-k="items" ${cfg.items!==false?"checked":""}></label>
+      <label>Przedmioty (odradzające się i wyrzucone)<input type="checkbox" data-k="items" ${cfg.items!==false?"checked":""}></label>
       <label>Teren z grafiki mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
       <label>Obiekty interaktywne<input type="checkbox" data-k="objects" ${cfg.objects?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
@@ -263,12 +273,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.3.3',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.3.4',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.3'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.4'};
   if(cfg.visible)render();
 })();
