@@ -276,7 +276,16 @@
     }
     let gates=[];
     try{gates=e?.map?.getGateways?.()?.getList?.()||[]}catch{}
-    gates=Array.isArray(gates)?gates.map(o=>{const p=coord(o);return p?{...p,raw:o,kind:"gateway"}:null}).filter(Boolean):[];
+    // Silnik trzyma nazwy przejsc w gateways.townnames[id], nie w d.nick.
+    const townnames=e?.map?.gateways?.townnames||{};
+    gates=Array.isArray(gates)?gates.map(o=>{
+      const p=coord(o);if(!p)return null;
+      const gd=o?.d||o;
+      const id=gd?.id;
+      const rawName=townnames[id]??townnames[String(id)]??gd?.nick??gd?.name??o?.name;
+      const gatewayName=typeof rawName==='string'?rawName.replace(/<[^>]*>/g,'').trim():'';
+      return {...p,name:gatewayName||'Przejście',id,raw:o,kind:'gateway'};
+    }).filter(Boolean):[];
     return {players,npcs,objects,monsters,gates,items};
   }
   function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -314,7 +323,17 @@
     }else if(type==="respawn"){
       subtitle=`Respawn herosa${p.lvl?` • Poziom: ${p.lvl}`:""}${checkedResp.has(`${p.x}:${p.y}:${p.nick}:${p.id??''}`)?" • Sprawdzony":""}`;
     }else if(type==="gateway"){
-      name=name||"Przejście";subtitle="Przejście na inną mapę";
+      name=p.name||"Przejście";subtitle="Przejście na inną mapę";
+    }
+    // Pozycje elementow odczytujemy z danych gry (w kratkach mapy).
+    // Dla poruszajacych sie graczy pokazujemy ostatnia otrzymana pozycje,
+    // a nie wspolrzedne chwilowej interpolacji graficznej.
+    const position=raw?.d||raw||p;
+    const px=Number(position?.x??position?.rx??p.x);
+    const py=Number(position?.y??position?.ry??p.y);
+    if(Number.isFinite(px)&&Number.isFinite(py)){
+      const coords=`X: ${Number.isInteger(px)?px:px.toFixed(1)}, Y: ${Number.isInteger(py)?py:py.toFixed(1)}`;
+      subtitle=subtitle?`${subtitle} • ${coords}`:coords;
     }
     return {name,subtitle,src};
   }
