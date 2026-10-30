@@ -356,7 +356,7 @@
     head.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;drag={x:e.clientX,y:e.clientY,left:cfg.x,top:cfg.y};head.setPointerCapture(e.pointerId)});
     head.addEventListener("pointermove",e=>{if(!drag)return;cfg.x=drag.left+e.clientX-drag.x;cfg.y=drag.top+e.clientY-drag.y;place()});
     head.addEventListener("pointerup",()=>{drag=null;save()});
-    canvas.addEventListener("wheel",e=>{e.preventDefault();cfg.zoom=Math.max(.5,Math.min(4,cfg.zoom+(e.deltaY<0?.2:-.2)));save()},{passive:false});
+    // Scroll nie zmienia skali mapy; rozmiar okna reguluje tylko opcja Rozmiar (px).
     place();loop();
   }
   function closeView(){clickTransform=null;cancelAnimationFrame(raf);tip?.remove();tip=null;hoverPos=null;hoverHits=[];hoverKey="";frame?.remove();frame=null;canvas=null;ctx=null;closeSettings()}
@@ -415,12 +415,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.3',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.4',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.3'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.4'};
   if(cfg.visible)render();
 })();
