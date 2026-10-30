@@ -82,8 +82,8 @@
         checkedResp.add(`${p.x}:${p.y}:${p.nick}:${p.id??''}`);
     }
   }
-  const respSyncTimer=setInterval(()=>{syncRespMap();installRespHook()},700);
-  installRespHook();
+  // Uruchamiamy obserwacje dopiero po inicjalizacji engine() ponizej.
+  let respSyncTimer=null;
 
   const css=document.createElement("style");css.id="ta-mm-style";
   css.textContent=`
@@ -113,6 +113,8 @@
   document.head.appendChild(css);
   function save(){B.setValue(KEY,cfg)}
   const engine=()=>window.Engine;
+  respSyncTimer=setInterval(()=>{syncRespMap();installRespHook()},700);
+  installRespHook();
   function data(){
     const e=engine(),m=e?.map;
     const d=m?.d||m?.data||{};
@@ -477,12 +479,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.5',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.6',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.5'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.6'};
   if(cfg.visible)render();
 })();
