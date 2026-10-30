@@ -314,12 +314,16 @@
     raf=requestAnimationFrame(loop);
   }
   function place(){
-    if(!frame)return;
+    if(!frame||!canvas)return;
+    cfg.size=Math.max(160,Math.min(1100,Math.round(Number(cfg.size)||280)));
     cfg.x=cfg.x==null?Math.max(5,innerWidth-cfg.size-300):Math.max(0,Math.min(innerWidth-cfg.size,cfg.x));
     cfg.y=Math.max(0,Math.min(innerHeight-50,cfg.y));
     frame.style.left=cfg.x+"px";frame.style.top=cfg.y+"px";
     frame.style.width=cfg.size+"px";
-    canvas.width=cfg.size;canvas.height=cfg.size;
+    // Zmiana width/height kasuje caly canvas, nawet przy tej samej wartosci.
+    // Podczas przesuwania okna NIE resetujemy bufora rysowania.
+    if(canvas.width!==cfg.size)canvas.width=cfg.size;
+    if(canvas.height!==cfg.size)canvas.height=cfg.size;
   }
   function render(){
     if(frame)return;
@@ -362,7 +366,7 @@
     menu.style.left=Math.max(10,Math.min(innerWidth-300,(cfg.x||100)+cfg.size+8))+"px";
     const colorControls=Object.entries(COLOR_LABELS).map(([key,label])=>`<label>${escapeHtml(label)}<input type="color" data-color="${key}" value="${color(key)}"></label>`).join('');
     menu.innerHTML=`<strong>Minimapa+ — ustawienia</strong>
-      <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="550" value="${cfg.size}"></label>
+      <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="1100" value="${cfg.size}"></label>
       <label>Powiększenie mapy<input type="number" data-k="zoom" min=".5" max="4" step=".2" value="${cfg.zoom}"></label>
       <label>Gracze (niebieskie kwadraty)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
       <label>NPC (zielone kwadraty)<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
@@ -383,7 +387,7 @@
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
       for(const k of ["players","npcs","monsters","items","gates","labels","terrain","objects","hoverPreview"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
-      cfg.size=Math.max(160,Math.min(550,Number(menu.querySelector('[data-k="size"]').value)||280));
+      cfg.size=Math.max(160,Math.min(1100,Number(menu.querySelector('[data-k="size"]').value)||280));
       cfg.zoom=Math.max(.5,Math.min(4,Number(menu.querySelector('[data-k="zoom"]').value)||1));
       menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
       save();place();closeSettings();
@@ -411,12 +415,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.0',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.1',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.0'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.1'};
   if(cfg.visible)render();
 })();
