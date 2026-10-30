@@ -46,7 +46,7 @@
   // Dane punktow respawnu pochodza z tego samego strumienia, co natywna minimapa.
   // Stan odwiedzenia istnieje tylko w pamieci i resetuje sie przy zmianie mapy.
   let respMapKey=null,respPoints=[],checkedResp=new Set(),respHookTarget=null,respHookOriginal=null;
-  const respRadius=5; // zasieg 5 kratek w kazdej osi (kwadrat 11x11)
+  const respRadiusSquared=144; // Gargonem: odleglosc euklidesowa < 12 kratek
   function currentMapKey(){
     const m=engine()?.map;
     if(!m)return null;
@@ -74,14 +74,21 @@
     respHookTarget=mm;respHookOriginal={fn:original,wrapped};
     mm.updateWindowMiniMapRespPos=wrapped;
   }
+  function respKey(p){
+    return `${p.x}:${p.y}:${p.nick}:${p.id??''}`;
+  }
   function markNearbyRespawns(hero){
     const hx=Number(hero?.x),hy=Number(hero?.y);
     if(!Number.isFinite(hx)||!Number.isFinite(hy))return;
+    // Jak w Gargonem: w jednym odswiezeniu oznacz tylko najblizszy
+    // jeszcze niesprawdzony resp, w promieniu mniejszym niz 12 pol.
+    let closest=null,closestDist=respRadiusSquared;
     for(const p of respPoints){
-      // Odleglosc po kazdej osi (Chebyshev); znacznik oznacza odwiedzony obszar, nie potwierdzony spawn.
-      if(Math.max(Math.abs(hx-p.x),Math.abs(hy-p.y))<=respRadius)
-        checkedResp.add(`${p.x}:${p.y}:${p.nick}:${p.id??''}`);
+      if(checkedResp.has(respKey(p)))continue;
+      const dx=p.x-hx,dy=p.y-hy,dist=dx*dx+dy*dy;
+      if(dist<closestDist){closestDist=dist;closest=p}
     }
+    if(closest)checkedResp.add(respKey(closest));
   }
   const respSyncTimer=setInterval(()=>{syncRespMap();installRespHook()},700);
   installRespHook();
@@ -360,14 +367,15 @@
     // Rysuj ramki NA KONCU, aby NPC, przedmioty i gracze ich nie zaslaniali.
     if(cfg.respawns!==false){
       for(const p of respPoints){
-        const key=`${p.x}:${p.y}:${p.nick}:${p.id??''}`;
+        const key=respKey(p);
         if(!checkedResp.has(key))continue;
         const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
         if(x<0||x>s||y<0||y>s)continue;
         ctx.save();
-        ctx.strokeStyle='#18baff';ctx.lineWidth=3;
-        ctx.shadowColor='#009dff';ctx.shadowBlur=5;
-        ctx.strokeRect(x-8,y-8,16,16);
+        ctx.strokeStyle='#64ffe9';ctx.lineWidth=Math.max(2,Math.min(4,scale*.35));
+        ctx.shadowColor='#64ffe9';ctx.shadowBlur=5;
+        const half=Math.max(7,Math.min(11,scale*.75));
+        ctx.strokeRect(x-half,y-half,half*2,half*2);
         ctx.restore();
       }
     }
@@ -442,7 +450,7 @@
       <label>Przedmioty (odradzające się i wyrzucone)<input type="checkbox" data-k="items" ${cfg.items!==false?"checked":""}></label>
       <label>Teren z grafiki mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
       <label>Obiekty interaktywne<input type="checkbox" data-k="objects" ${cfg.objects?"checked":""}></label>
-      <label>Respawny herosów (niebieska ramka po podejściu)<input type="checkbox" data-k="respawns" ${cfg.respawns!==false?"checked":""}></label>
+      <label>Respawny herosów (turkusowa ramka po podejściu)<input type="checkbox" data-k="respawns" ${cfg.respawns!==false?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podgląd elementów po najechaniu<input type="checkbox" data-k="hoverPreview" ${cfg.hoverPreview!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
@@ -484,12 +492,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.7',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.8',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.7'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.8'};
   if(cfg.visible)render();
 })();
