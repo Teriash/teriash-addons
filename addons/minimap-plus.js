@@ -39,6 +39,7 @@
   }
 
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
+  let clickTransform=null;
   const css=document.createElement("style");css.id="ta-mm-style";
   css.textContent=`
   #ta-mm{position:fixed;z-index:8500;width:280px;background:#0c181eea;color:#dceaf0;border:1px solid #286b76;
@@ -262,6 +263,7 @@
     const scale=valid?Math.min(s/w,s/h)*cfg.zoom:Math.max(5,s/45)*cfg.zoom;
     const ox=valid?(s-w*scale)/2:s/2-(Number(d.hero.x)||0)*scale;
     const oy=valid?(s-h*scale)/2:s/2-(Number(d.hero.y)||0)*scale;
+    clickTransform=valid?{ox,oy,scale,w,h,mapId:String(d.e?.map?.getId?.()??d.e?.map?.d?.id??"")}:null;
     loadBackground(d.e);
     let terrain=false;
     if(cfg.terrain!==false&&bgImage&&bgState==="ready"){
@@ -327,6 +329,22 @@
     tip=document.createElement("div");tip.id="ta-mm-preview";document.body.appendChild(tip);
     canvas.addEventListener("pointermove",e=>{hoverPos={x:e.clientX,y:e.clientY};updatePreview()});
     canvas.addEventListener("pointerleave",()=>{hoverPos=null;hidePreview()});
+    // Use exactly the same tile-space transform as paint(), including zoom.
+    canvas.addEventListener("click",e=>{
+      if(e.button!==0||!clickTransform)return;
+      const t=clickTransform,rect=canvas.getBoundingClientRect();
+      if(!rect.width||!rect.height)return;
+      const px=(e.clientX-rect.left)*canvas.width/rect.width;
+      const py=(e.clientY-rect.top)*canvas.height/rect.height;
+      const x=Math.floor((px-t.ox)/t.scale),y=Math.floor((py-t.oy)/t.scale);
+      if(x<0||y<0||x>=t.w||y>=t.h)return;
+      const eng=engine();
+      if(typeof eng?.hero?.autoGoTo!=="function")return;
+      const currentMap=String(eng?.map?.getId?.()??eng?.map?.d?.id??"");
+      if(t.mapId!==currentMap)return;
+      try{eng.hero.autoGoTo({x,y},false)}
+      catch(error){console.warn("[Minimapa+] Nie udalo sie rozpoczac ruchu:",error)}
+    });
     frame.querySelector('[data-act="settings"]').onclick=openSettings;
     frame.querySelector('[data-act="hide"]').onclick=()=>{cfg.visible=false;save();closeView()};
     const head=frame.querySelector(".head");
@@ -336,7 +354,7 @@
     canvas.addEventListener("wheel",e=>{e.preventDefault();cfg.zoom=Math.max(.5,Math.min(4,cfg.zoom+(e.deltaY<0?.2:-.2)));save()},{passive:false});
     place();loop();
   }
-  function closeView(){cancelAnimationFrame(raf);tip?.remove();tip=null;hoverPos=null;hoverHits=[];hoverKey="";frame?.remove();frame=null;canvas=null;ctx=null;closeSettings()}
+  function closeView(){clickTransform=null;cancelAnimationFrame(raf);tip?.remove();tip=null;hoverPos=null;hoverHits=[];hoverKey="";frame?.remove();frame=null;canvas=null;ctx=null;closeSettings()}
   function openSettings(){
     if(menu){closeSettings();return}
     menu=document.createElement("div");menu.id="ta-mm-settings";document.body.appendChild(menu);
@@ -393,12 +411,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.3.9',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.0',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.9'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.0'};
   if(cfg.visible)render();
 })();
