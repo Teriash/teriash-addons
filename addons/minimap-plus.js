@@ -28,9 +28,14 @@
   function isMonster(o,kind){
     const d=o?.d||{};
     const k=String(kind||'').toLowerCase();
-    return k.includes('monster')||k.includes('elite')||k.includes('hero')||
+    // Elity II: silnik zwraca getKind()==='elita2', type===2 i wt 20..29.
+    // Sam typ 2 nie wystarcza do rozpoznania potwora.
+    const wt=Number(o?.getWt?.()??d.wt);
+    return k.includes('monster')||k.includes('elite')||k.includes('elita')||
+      k.includes('hero')||k.includes('heros')||
       k.includes('titan')||k.includes('tytan')||
-      Number(d.type)===3;
+      Number(d.type)===3||
+      (Number(d.type)===2&&wt>=20&&wt<30);
   }
 
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
@@ -388,12 +393,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.3.8',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.3.9',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.8'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.9'};
   if(cfg.visible)render();
 })();
