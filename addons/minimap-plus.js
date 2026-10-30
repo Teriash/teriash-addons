@@ -2,8 +2,29 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:280,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:280,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,colors:{}};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
+  const DEFAULT_COLORS={hero:'#f9dd56',player:'#63caff',npc:'#46d787',object:'#9ba7ae',gateway:'#ae83ff',monsterNormal:'#ef5555',monsterElite:'#ff9b48',monsterElite2:'#ffdf55',monsterHero:'#a87bff',monsterTitan:'#f078df',itemRecovery:'#f3a74c',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
+  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
+  cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
+  function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
+  // Margonem: getWt()/d.wt okresla range potwora, niezaleznie od getKind().
+  function monsterClass(o,kind){
+    const wt=Number(o?.getWt?.()??o?.d?.wt??o?.d?.weight);
+    if(Number.isFinite(wt)){
+      if(wt===4)return 'monsterTitan';
+      if(wt===3)return 'monsterHero';
+      if(wt===2)return 'monsterElite2';
+      if(wt===1)return 'monsterElite';
+    }
+    const k=String(kind||'').toLowerCase();
+    if(k.includes('titan'))return 'monsterTitan';
+    if(k.includes('hero'))return 'monsterHero';
+    if(k.includes('elite2')||k.includes('elite-2'))return 'monsterElite2';
+    if(k.includes('elite'))return 'monsterElite';
+    return 'monsterNormal';
+  }
+
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
   const css=document.createElement("style");css.id="ta-mm-style";
   css.textContent=`
@@ -20,6 +41,9 @@
   #ta-mm-preview .ta-tip-title{font-weight:700;font-size:13px;margin-bottom:5px;overflow-wrap:anywhere}
   #ta-mm-preview .ta-tip-sub{color:#c4d0d5;margin:4px 0;overflow-wrap:anywhere}
   #ta-mm-preview img{display:block;max-width:125px;max-height:125px;object-fit:contain;margin:7px auto;image-rendering:auto}
+  #ta-mm-preview .ta-outfit{width:32px;height:48px;background-repeat:no-repeat;background-position:0 0;margin:7px auto;image-rendering:pixelated}
+  #ta-mm-settings .ta-colors{max-height:225px;overflow:auto;border:1px solid #31515b;padding:3px 8px;margin:8px 0}
+  #ta-mm-settings input[type=color]{width:44px;height:26px;padding:1px;background:transparent;border:1px solid #426873;cursor:pointer}
   #ta-mm-preview .ta-tip-list{font-size:11px;color:#b9c8cd;margin-top:5px}
   #ta-mm-settings{position:fixed;z-index:8501;width:280px;background:#0e1d23;color:#def;padding:13px;
     border:1px solid #327582;border-radius:10px;box-shadow:0 12px 30px #000a;font:12px Arial}
@@ -123,7 +147,7 @@
       try{kind=String(o.getKind?.()||"").toLowerCase()}catch{}
       // Nie filtruj po lvl: niektore prawdziwe potwory (np. Krabik) maja lvl=0.
       if(kind.includes("monster")||kind.includes("elite")||kind.includes("hero")||kind.includes("titan")){
-        p.lvl=Number(d.lvl)||0;p.kind=kind;monsters.push(p);
+        p.lvl=Number(d.lvl)||0;p.kind=kind;p.monsterClass=monsterClass(o,kind);monsters.push(p);
       }else if(kind==="recovery" && Number(d.type)===7){
         // Rosliny i inne przedmioty odradzajace sie sa obiektami NPC typu 7.
         recovery.push({...p,id:d.id,source:"recovery",rarity:"normal",kind:"item"});
@@ -162,18 +186,26 @@
     if(src.includes("..")||src.includes("\\"))return "";
     return (window.CFG?.a_npath||window.CFG?.a_ipath||"")+src;
   }
+  function outfitUrl(value){
+    if(typeof value!=='string'||!value.trim())return '';
+    const v=value.trim();
+    if(/^(?:paid|kuf|eve|clan|premium|event|npc)\//i.test(v))return 'https://micc.garmory-cdn.cloud/obrazki/postacie/'+v;
+    if(/^\/(?:paid|kuf|eve|clan|premium|event|npc)\//i.test(v))return 'https://micc.garmory-cdn.cloud/obrazki/postacie/'+v.slice(1);
+    return imageUrl(v);
+  }
   function previewInfo(hit){
     const p=hit.p,raw=p.raw,d=raw?.d||{},type=hit.type;
     let name=p.name||d.nick||d.name||"Nieznany element",subtitle="",src="";
     if(type==="monster"){
-      subtitle=[p.lvl?`Poziom: ${p.lvl}`:"",p.kind?.includes("titan")?"Tytan":p.kind?.includes("hero")?"Heros":p.kind?.includes("elite")?"Elita":"Potwór"].filter(Boolean).join(" • ");
+      const labels={monsterNormal:'Potwór',monsterElite:'Elita',monsterElite2:'Elita II',monsterHero:'Heros',monsterTitan:'Tytan'};
+      subtitle=[p.lvl?`Poziom: ${p.lvl}`:"",labels[p.monsterClass]||'Potwór'].filter(Boolean).join(" • ");
       src=imageUrl(d.icon||d.img||raw?.icon||raw?.getIcon?.());
     }else if(type==="npc"||type==="object"){
       subtitle=type==="npc"?"NPC":"Obiekt interaktywny";
       src=imageUrl(d.icon||d.img||raw?.getIcon?.());
     }else if(type==="player"||type==="hero"){
       subtitle=[d.lvl?`Poziom: ${d.lvl}`:"",d.prof?`Profesja: ${d.prof}`:""].filter(Boolean).join(" • ")||"Gracz";
-      src=imageUrl(d.icon||d.img||d.outfit||raw?.getIcon?.());
+      src=outfitUrl(d.outfit||d.icon||d.img||raw?.getIcon?.());
     }else if(type==="item"){
       subtitle=p.source==="recovery"?"Przedmiot odradzający się":"Przedmiot wyrzucony";
       src=imageUrl(raw?.i?.icon||d.icon||raw?.icon||raw?.getIcon?.());
@@ -200,7 +232,9 @@
     nearby.reverse();const primary=nearby[0],key=nearby.map(h=>`${h.type}:${h.p.id??h.p.name}:${h.p.x}:${h.p.y}`).join("|");
     if(key!==hoverKey){
       hoverKey=key;const info=previewInfo(primary);
-      const img=info.src?`<img alt="" src="${escapeHtml(info.src)}" onerror="this.style.display='none'">`:"";
+      const img=info.src?((primary.type==='player'||primary.type==='hero')
+        ?`<div class="ta-outfit" style="background-image:url('${escapeHtml(info.src)}')"></div>`
+        :`<img alt="" src="${escapeHtml(info.src)}" onerror="this.style.display='none'">`):"";
       const more=nearby.length>1?`<div class="ta-tip-list">W tym miejscu: ${nearby.length} elementy<br>${nearby.slice(1,5).map(h=>escapeHtml(h.p.name||h.type)).join(" · ")}</div>`:"";
       tip.innerHTML=`<div class="ta-tip-title">${escapeHtml(info.name)}</div><div class="ta-tip-sub">${escapeHtml(info.subtitle)}</div>${img}${more}`;
       tip.style.display="block";
@@ -241,20 +275,18 @@
       if(cfg.labels&&p.name){ctx.font='10px Arial';ctx.fillStyle='#fff';ctx.fillText(p.name,x+radius+3,y-4)}
     };
     const m=getMarkers(d.e);
-    if(cfg.gates!==false)for(const v of m.gates)mark(v,'#ae83ff',3.6,'gateway');
-    if(cfg.objects)for(const v of m.objects)mark(v,'#9ba7ae',2.5,'object');
-    if(cfg.npcs)for(const v of m.npcs)mark(v,'#46d787',3,'npc');
+    if(cfg.gates!==false)for(const v of m.gates)mark(v,color('gateway'),3.6,'gateway');
+    if(cfg.objects)for(const v of m.objects)mark(v,color('object'),2.5,'object');
+    if(cfg.npcs)for(const v of m.npcs)mark(v,color('npc'),3,'npc');
     if(cfg.monsters!==false)for(const v of m.monsters){
-      const k=v.kind;
-      const color=k.includes("titan")?'#e6a5ff':k.includes("hero")?'#ffd15a':k.includes("elite")?'#ffab47':'#ef5555';
-      mark(v,color,3.2,"monster");
+      mark(v,color(v.monsterClass||'monsterNormal'),3.2,"monster");
     }
     if(cfg.items!==false)for(const v of m.items){
-      const color=v.source==='recovery'?'#f3a74c':v.rarity==='legendary'?'#ffd15a':v.rarity==='heroic'?'#58d7ff':v.rarity==='unique'?'#ff9b48':'#f1f5f9';
-      mark(v,color,3,"item");
+      const key=v.source==='recovery'?'itemRecovery':v.rarity==='legendary'?'itemLegendary':v.rarity==='heroic'?'itemHeroic':v.rarity==='unique'?'itemUnique':'itemNormal';
+      mark(v,color(key),3,"item");
     }
-    if(cfg.players)for(const v of m.players)mark(v,'#63caff',3.5,'player');
-    mark({...coord(d.hero),raw:{d:d.hero},kind:'hero'},'#f9dd56',5,'hero');
+    if(cfg.players)for(const v of m.players)mark(v,color('player'),3.5,'player');
+    mark({...coord(d.hero),raw:{d:d.hero},kind:'hero'},color('hero'),5,'hero');
     note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length}`:'Brak wymiarów mapy';
     updatePreview();
     const footer=frame.querySelector('.footer');
@@ -297,6 +329,7 @@
     menu=document.createElement("div");menu.id="ta-mm-settings";document.body.appendChild(menu);
     menu.style.top=Math.max(10,Math.min(innerHeight-300,(cfg.y||90)))+"px";
     menu.style.left=Math.max(10,Math.min(innerWidth-300,(cfg.x||100)+cfg.size+8))+"px";
+    const colorControls=Object.entries(COLOR_LABELS).map(([key,label])=>`<label>${escapeHtml(label)}<input type="color" data-color="${key}" value="${color(key)}"></label>`).join('');
     menu.innerHTML=`<strong>Minimapa+ — ustawienia</strong>
       <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="550" value="${cfg.size}"></label>
       <label>Powiększenie mapy<input type="number" data-k="zoom" min=".5" max="4" step=".2" value="${cfg.zoom}"></label>
@@ -309,13 +342,19 @@
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podgląd elementów po najechaniu<input type="checkbox" data-k="hoverPreview" ${cfg.hoverPreview!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
+      <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div>
+      <button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
       <button data-a="save">Zapisz</button> <button data-a="close">Zamknij</button>
       <p style="color:#9eb6bd;line-height:1.4">Teren jest pobierany bezpośrednio z Engine.map.src. Nie trzeba otwierać podręcznej mapy. Rozpoznawanie elit i rzadkości przedmiotów jest wstępne.</p>`;
+    menu.querySelector('[data-a="resetcolors"]').onclick=()=>{
+      menu.querySelectorAll('[data-color]').forEach(input=>input.value=DEFAULT_COLORS[input.dataset.color]);
+    };
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
       for(const k of ["players","npcs","monsters","items","gates","labels","terrain","objects","hoverPreview"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(550,Number(menu.querySelector('[data-k="size"]').value)||280));
       cfg.zoom=Math.max(.5,Math.min(4,Number(menu.querySelector('[data-k="zoom"]').value)||1));
+      menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
       save();place();closeSettings();
     };
   }
@@ -341,12 +380,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.3.5',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.3.6',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.5'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.6'};
   if(cfg.visible)render();
 })();
