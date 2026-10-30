@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.6.0",
+  "suiteVersion": "1.6.1",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -58,8 +58,8 @@
     {
       "id": "minimapPlus",
       "name": "Minimapa+",
-      "description": "Osobna, przesuwalna minimapa z regulacją rozmiaru i podglądem mapy",
-      "version": "0.1.0",
+      "description": "Minimapa ze współrzędnych gry i własnymi znacznikami NPC, graczy i przejść",
+      "version": "0.2.0",
       "file": "addons/minimap-plus.js",
       "defaultEnabled": false,
       "settingsGlobal": "TeriashMinimapPlus",

@@ -2,7 +2,7 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:true,size:280,x:null,y:90,zoom:1,players:true,npcs:true,labels:false};
+  const KEY="ta.minimapPlus.v1",defaults={visible:true,size:280,x:null,y:90,zoom:1,players:true,npcs:true,labels:false,gates:true};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="";
   const css=document.createElement("style");css.id="ta-mm-style";
@@ -47,37 +47,106 @@
     const x=Number(d?.x??d?.rx),y=Number(d?.y??d?.ry);
     return Number.isFinite(x)&&Number.isFinite(y)?{x,y,name:String(d.nick||d.name||"")}:null;
   }
-  function nativeCanvas(){
-    const candidates=[...document.querySelectorAll('.mini-map canvas,.mini-map-controller canvas,[class*="mini-map"] canvas')];
-    return candidates.find(c=>c!==canvas&&c.width>50&&c.height>50)||null;
+  // Margonem's native minimap is often a WebGL/DOM layer: copying a
+  // canvas can return an entirely empty image. Read game state instead.
+  function mapSize(d){
+    const m=d.e?.map,raw=m?.d||{};
+    const w=Number(raw.x??raw.width??raw.w??m?.width??0);
+    const h=Number(raw.y??raw.height??raw.h??m?.height??0);
+    return {w,h};
+  }
+  function rawList(source){
+    if(!source)return [];
+    if(Array.isArray(source))return source;
+    if(typeof source==="object")return Object.values(source);
+    return [];
+  }
+  function collect(e,kind){
+    const o=kind==="npc"?e?.npcs:kind==="player"?e?.others:e?.map;
+    const sources=kind==="npc"?[o?.d,o?.list,o?.getNpcList?.()]:
+      kind==="player"?[o?.d,o?.list,o?.getOtherList?.()]:
+      [o?.gateways,o?.gates,o?.d?.gateways,o?.d?.gates,o?.d?.gw,o?.d?.npcs];
+    const out=[],seen=new Set();
+    for(const source of sources){
+      for(const item of rawList(source)){
+        const q=coord(item);
+        if(!q)continue;
+        const key=`${q.x}:${q.y}:${item?.id??item?.d?.id??""}`;
+        if(seen.has(key))continue;
+        seen.add(key);out.push({...q,raw:item});
+      }
+    }
+    return out;
+  }
+  function terrainSource(){
+    // Read the same image source as the native minimap, if it is an
+    // image/background element. Do not copy a blank WebGL canvas.
+    const els=[...document.querySelectorAll(
+      '.mini-map img,.mini-map-controller img,[class*="mini-map"] img,'+
+      '.mini-map [style*="background-image"],.mini-map-controller [style*="background-image"]'
+    )].filter(el=>!el.closest('#ta-mm'));
+    for(const el of els){
+      const url=el.tagName==='IMG'?el.currentSrc||el.src:
+        getComputedStyle(el).backgroundImage.match(/url\(["']?(.*?)["']?\)/)?.[1];
+      if(url&&url!=='none')return url;
+    }
+    return null;
+  }
+  let bgImage=null,bgUrl="",bgFailed=false;
+  function loadBackground(){
+    const url=terrainSource();
+    if(!url||url===bgUrl)return;
+    bgUrl=url;bgFailed=false;bgImage=new Image();
+    bgImage.onload=()=>{bgFailed=false};
+    bgImage.onerror=()=>{bgFailed=true;bgImage=null};
+    bgImage.src=url;
   }
   function paint(){
     if(!canvas||!frame?.isConnected)return;
-    const d=data(),s=canvas.width;ctx.clearRect(0,0,s,s);
+    const d=data(),s=canvas.width,ms=mapSize(d);
+    ctx.clearRect(0,0,s,s);
     ctx.fillStyle="#102027";ctx.fillRect(0,0,s,s);
-    const src=nativeCanvas();
-    if(src){
-      try{ctx.drawImage(src,0,0,s,s);note="Podgląd oryginalnej minimapy"}
-      catch{note="Nie można skopiować minimapy"}
+    loadBackground();
+    const w=ms.w,h=ms.h,valid=w>0&&h>0&&w<10000&&h<10000;
+    const scale=valid?Math.min(s/w,s/h)*cfg.zoom:Math.max(5,s/45)*cfg.zoom;
+    const ox=valid?(s-w*scale)/2: s/2-(Number(d.hero.x)||0)*scale;
+    const oy=valid?(s-h*scale)/2: s/2-(Number(d.hero.y)||0)*scale;
+    // Render native map image only when available. It may be a small
+    // cropped preview, so use it as a background rather than geometry.
+    if(bgImage?.complete&&bgImage.naturalWidth&&!bgFailed){
+      try{ctx.globalAlpha=.35;ctx.drawImage(bgImage,0,0,s,s);ctx.globalAlpha=1}catch{ctx.globalAlpha=1}
+    }
+    ctx.strokeStyle="#24424a";ctx.lineWidth=.7;
+    const step=Math.max(1,Math.round(5/cfg.zoom));
+    if(valid){
+      const max=Math.min(w*h,120000);
+      if(max>0){
+        ctx.beginPath();
+        for(let x=0;x<=w;x+=step){const px=ox+x*scale;ctx.moveTo(px,oy);ctx.lineTo(px,oy+h*scale)}
+        for(let y=0;y<=h;y+=step){const py=oy+y*scale;ctx.moveTo(ox,py);ctx.lineTo(ox+w*scale,py)}
+        ctx.stroke();
+      }
     }else{
-      note="Brak źródła minimapy — siatka orientacyjna";
-      ctx.strokeStyle="#25424a";ctx.lineWidth=1;
       for(let i=0;i<s;i+=20){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,s);ctx.moveTo(0,i);ctx.lineTo(s,i);ctx.stroke()}
     }
-    // Znaczniki rysujemy wyłącznie wtedy, gdy znamy rozmiar mapy.
-    // Przy podglądzie natywnej minimapy nie nakładamy współrzędnych, bo
-    // jej własna transformacja/zoom może być inna.
-    if(!src&&d.w>0&&d.h>0){
-      const scale=Math.min(s/d.w,s/d.h)*cfg.zoom,ox=(s-d.w*scale)/2,oy=(s-d.h*scale)/2;
-      const mark=(p,color,r)=>{if(!p)return;const x=ox+p.x*scale,y=oy+p.y*scale;
-        if(x<0||x>s||y<0||y>s)return;
-        ctx.beginPath();ctx.fillStyle=color;ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
-        if(cfg.labels&&p.name){ctx.font="10px Arial";ctx.fillStyle="#fff";ctx.fillText(p.name,x+6,y-5)}
-      };
-      if(cfg.npcs)for(const n of getList(d.e,"npc"))mark(coord(n),"#ef6666",2.5);
-      if(cfg.players)for(const p of getList(d.e,"player"))mark(coord(p),"#6ad8ff",3);
-      mark(coord(d.hero),"#f8d94a",5);
-    }
+    const mark=(p,color,shape='square',radius=4)=>{
+      if(!p)return;
+      const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
+      if(x<0||x>s||y<0||y>s)return;
+      ctx.fillStyle=color;ctx.strokeStyle="#081217";ctx.lineWidth=1.5;
+      ctx.beginPath();
+      if(shape==='circle')ctx.arc(x,y,radius,0,Math.PI*2);
+      else ctx.rect(x-radius,y-radius,radius*2,radius*2);
+      ctx.fill();ctx.stroke();
+      if(cfg.labels&&p.name){ctx.font="10px Arial";ctx.fillStyle="#fff";ctx.fillText(p.name,x+radius+3,y-4)}
+    };
+    const npc=collect(d.e,"npc"),players=collect(d.e,"player"),gates=collect(d.e,"gate");
+    if(cfg.gates!==false)for(const v of gates)mark(v,"#ae83ff","square",4);
+    if(cfg.npcs)for(const v of npc)mark(v,"#e97457","square",3);
+    if(cfg.players)for(const v of players)mark(v,"#63caff","circle",3.5);
+    mark(coord(d.hero),"#f9dd56","circle",5);
+    note=valid?`Mapa ${w}×${h} • NPC: ${npc.length} • gracze: ${players.length} • przejścia: ${gates.length}`:
+      "Brak rozmiaru mapy w Engine.map — tryb awaryjny";
     const footer=frame.querySelector(".footer");
     if(footer)footer.textContent=(d.mapName||"Margonem")+" • "+(d.hero?.x??"?")+","+(d.hero?.y??"?")+" • "+note;
   }
@@ -113,14 +182,15 @@
     menu.innerHTML=`<strong>Minimapa+ — ustawienia</strong>
       <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="550" value="${cfg.size}"></label>
       <label>Zoom siatki<input type="number" data-k="zoom" min=".5" max="4" step=".2" value="${cfg.zoom}"></label>
-      <label>Gracze (siatka)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
-      <label>Potwory (siatka)<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
-      <label>Podpisy (siatka)<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
+      <label>Gracze (niebieskie kółka)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
+      <label>Potwory (pomarańczowe kwadraty)<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
+      <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
+      <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <button data-a="save">Zapisz</button> <button data-a="close">Zamknij</button>
-      <p style="color:#9eb6bd;line-height:1.4">Gdy klient udostępnia płótno oryginalnej minimapy, pokazujemy jego podgląd. W przeciwnym razie orientacyjną siatkę i dostępne znaczniki. Dane ukryte przez grę nie są pobierane.</p>`;
+      <p style="color:#9eb6bd;line-height:1.4">Mapa jest budowana ze współrzędnych udostępnionych przez klienta gry. Kolory i kształty znaczników są niezależne od oryginalnej minimapy. Jeżeli klient nie udostępnia danych przejść, nie pojawią się ich znaczniki.</p>`;
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
-      for(const k of ["players","npcs","labels"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      for(const k of ["players","npcs","gates","labels"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(550,Number(menu.querySelector('[data-k="size"]').value)||280));
       cfg.zoom=Math.max(.5,Math.min(4,Number(menu.querySelector('[data-k="zoom"]').value)||1));
       save();place();closeSettings();
