@@ -2,7 +2,7 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:true,size:280,x:null,y:90,zoom:1,players:true,npcs:true,labels:false,gates:true};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:280,x:null,y:90,zoom:1,players:true,npcs:true,labels:false,gates:true};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="";
   const css=document.createElement("style");css.id="ta-mm-style";
@@ -198,7 +198,18 @@
   }
   function closeSettings(){menu?.remove();menu=null}
   function toggle(){cfg.visible=!cfg.visible;save();cfg.visible?render():closeView()}
-  function destroy(){closeView();css.remove();delete window.TeriashMinimapPlus}
+  // Q toggles our minimap only while playing, never while typing.
+  function onKeyDown(event){
+    if(event.code!=="KeyQ" || event.repeat || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey)return;
+    const el=event.target;
+    if(el?.isContentEditable || el?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]'))return;
+    if(!window.Engine)return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggle();
+  }
+  document.addEventListener("keydown",onKeyDown,true);
+  function destroy(){document.removeEventListener("keydown",onKeyDown,true);closeView();css.remove();delete window.TeriashMinimapPlus}
   window.TeriashMinimapPlus={openSettings,toggle,destroy};
   if(cfg.visible)render();
 })();

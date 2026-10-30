@@ -227,3 +227,6 @@ Zmiana wyłącznie rozmiaru i wizualnego położenia oryginalnego panelu. Bez pr
 
 ### v1.6.0 — Minimapa+ (eksperymentalna)
 Włącz w panelu TA. Przesuwaj za pasek tytułu; ustaw rozmiar w ⚙. Przycisk × ukrywa minimapę (nie wyłącza modułu). Widoczność i pozycja są zapamiętywane. Podgląd opiera się na natywnym canvas, jeśli istnieje; w przeciwnym razie wyświetlana jest orientacyjna siatka. Znaczniki siatki korzystają tylko z dostępnych danych klienta. Nie jest to jeszcze pełna mapa świata.
+
+### v1.6.2 — Minimapa+ 0.2.1
+Klawisz Q otwiera/zamyka Minimapa+. Nie przechwytuje Q podczas pisania w polach tekstowych. Nowe instalacje startują z ukrytym oknem.
