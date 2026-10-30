@@ -8,21 +8,28 @@
   const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
   cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
   function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
-  // Margonem: getWt()/d.wt okresla range potwora, niezaleznie od getKind().
+  // Ranga w silniku: 1=zwykly, 2=elita, 3=elita II, 4=heros, 5=tytan.
+  // Wczesniejsza wersja blednie traktowala wt=1 jako elite.
+  // Dodatkowe oznaczenia tekstowe sa uzywane tylko gdy wt jest nieznane.
   function monsterClass(o,kind){
-    const wt=Number(o?.getWt?.()??o?.d?.wt??o?.d?.weight);
-    if(Number.isFinite(wt)){
-      if(wt===4)return 'monsterTitan';
-      if(wt===3)return 'monsterHero';
-      if(wt===2)return 'monsterElite2';
-      if(wt===1)return 'monsterElite';
-    }
-    const k=String(kind||'').toLowerCase();
-    if(k.includes('titan'))return 'monsterTitan';
-    if(k.includes('hero'))return 'monsterHero';
-    if(k.includes('elite2')||k.includes('elite-2'))return 'monsterElite2';
-    if(k.includes('elite'))return 'monsterElite';
+    const d=o?.d||{};
+    const raw=o?.getWt?.()??d.wt;
+    const wt=raw===null||raw===undefined||raw===''?NaN:Number(raw);
+    const ranks={0:'monsterNormal',1:'monsterNormal',2:'monsterElite',3:'monsterElite2',4:'monsterHero',5:'monsterTitan'};
+    if(Number.isInteger(wt)&&Object.prototype.hasOwnProperty.call(ranks,wt))return ranks[wt];
+    const label=String(d.rank??d.ranga??d.category??kind??'').toLowerCase();
+    if(/elite[ _-]?(?:ii|2)\\b|elita[ _-]?(?:ii|2)\\b/.test(label))return 'monsterElite2';
+    if(/titan|tytan/.test(label))return 'monsterTitan';
+    if(/hero|heros/.test(label))return 'monsterHero';
+    if(/elite|elita/.test(label))return 'monsterElite';
     return 'monsterNormal';
+  }
+  function isMonster(o,kind){
+    const d=o?.d||{};
+    const k=String(kind||'').toLowerCase();
+    return k.includes('monster')||k.includes('elite')||k.includes('hero')||
+      k.includes('titan')||k.includes('tytan')||
+      Number(d.type)===3;
   }
 
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
@@ -146,7 +153,7 @@
       let kind="";
       try{kind=String(o.getKind?.()||"").toLowerCase()}catch{}
       // Nie filtruj po lvl: niektore prawdziwe potwory (np. Krabik) maja lvl=0.
-      if(kind.includes("monster")||kind.includes("elite")||kind.includes("hero")||kind.includes("titan")){
+      if(isMonster(o,kind)){
         p.lvl=Number(d.lvl)||0;p.kind=kind;p.monsterClass=monsterClass(o,kind);monsters.push(p);
       }else if(kind==="recovery" && Number(d.type)===7){
         // Rosliny i inne przedmioty odradzajace sie sa obiektami NPC typu 7.
@@ -380,12 +387,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.3.6',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.3.7',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.6'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.7'};
   if(cfg.visible)render();
 })();
