@@ -40,6 +40,7 @@
       (Number(d.type)===2&&wt>=20&&wt<30);
   }
 
+  const engine=()=>window.Engine;
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
   let clickTransform=null;
   // Dane punktow respawnu pochodza z tego samego strumienia, co natywna minimapa.
@@ -112,7 +113,6 @@
   `;
   document.head.appendChild(css);
   function save(){B.setValue(KEY,cfg)}
-  const engine=()=>window.Engine;
   function data(){
     const e=engine(),m=e?.map;
     const d=m?.d||m?.data||{};
@@ -477,12 +477,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.5',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.6',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.5'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.6'};
   if(cfg.visible)render();
 })();
