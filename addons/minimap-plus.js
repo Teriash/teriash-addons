@@ -8,17 +8,18 @@
   const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
   cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
   function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
-  // Ranga w silniku: 1=zwykly, 2=elita, 3=elita II, 4=heros, 5=tytan.
-  // Wczesniejsza wersja blednie traktowala wt=1 jako elite.
-  // Dodatkowe oznaczenia tekstowe sa uzywane tylko gdy wt jest nieznane.
+  // Potwierdzone w kodzie silnika Margonem: isEliteIIMob(t) sprawdza 19 < d.wt < 30.
+  // wt=2 (Slepa Strzala) jest zwyklym potworem, NIE elita.
+  // Pozostale wartosci wt nie maja jeszcze zweryfikowanego mapowania rang.
+  // Nie przypisujemy im elit/herosow/tytanow na podstawie zgadywanych numerow.
   function monsterClass(o,kind){
     const d=o?.d||{};
     const raw=o?.getWt?.()??d.wt;
     const wt=raw===null||raw===undefined||raw===''?NaN:Number(raw);
-    const ranks={0:'monsterNormal',1:'monsterNormal',2:'monsterElite',3:'monsterElite2',4:'monsterHero',5:'monsterTitan'};
-    if(Number.isInteger(wt)&&Object.prototype.hasOwnProperty.call(ranks,wt))return ranks[wt];
-    const label=String(d.rank??d.ranga??d.category??kind??'').toLowerCase();
-    if(/elite[ _-]?(?:ii|2)\\b|elita[ _-]?(?:ii|2)\\b/.test(label))return 'monsterElite2';
+    if(Number.isInteger(wt)&&wt>19&&wt<30)return 'monsterElite2';
+    // Opcjonalne jawne etykiety rangi, jesli udostepni je silnik.
+    const label=String(d.rank??d.ranga??d.category??'').toLowerCase();
+    if(/(?:elite|elita)[ _-]?(?:ii|2)\b/.test(label))return 'monsterElite2';
     if(/titan|tytan/.test(label))return 'monsterTitan';
     if(/hero|heros/.test(label))return 'monsterHero';
     if(/elite|elita/.test(label))return 'monsterElite';
@@ -387,12 +388,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.3.7',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.3.8',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.7'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.8'};
   if(cfg.visible)render();
 })();
