@@ -2,12 +2,12 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,colors:{}};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,colors:{}};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
-  const DEFAULT_COLORS={hero:'#f9dd56',player:'#63caff',npc:'#46d787',object:'#9ba7ae',gateway:'#ae83ff',monsterNormal:'#ef5555',monsterElite:'#ff9b48',monsterElite2:'#ffdf55',monsterHero:'#a87bff',monsterTitan:'#f078df',itemRecovery:'#f3a74c',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
-  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
+  const DEFAULT_COLORS={hero:'#f9dd56',player:'#63caff',npc:'#46d787',object:'#9ba7ae',gateway:'#ae83ff',respawn:'#ffad4d',monsterNormal:'#ef5555',monsterElite:'#ff9b48',monsterElite2:'#ffdf55',monsterHero:'#a87bff',monsterTitan:'#f078df',itemRecovery:'#f3a74c',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
+  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
   cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
   function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
   // Potwierdzone w kodzie silnika Margonem: isEliteIIMob(t) sprawdza 19 < d.wt < 30.
@@ -42,6 +42,49 @@
 
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
   let clickTransform=null;
+  // Dane punktow respawnu pochodza z tego samego strumienia, co natywna minimapa.
+  // Stan odwiedzenia istnieje tylko w pamieci i resetuje sie przy zmianie mapy.
+  let respMapKey=null,respPoints=[],checkedResp=new Set(),respHookTarget=null,respHookOriginal=null;
+  const respRadius=5;
+  function currentMapKey(){
+    const m=engine()?.map;
+    if(!m)return null;
+    const id=m.getId?.()??m.d?.id??m.d?.name??m.name;
+    return id==null?null:String(id);
+  }
+  function syncRespMap(){
+    const key=currentMapKey();
+    if(key!==respMapKey){respMapKey=key;respPoints=[];checkedResp.clear()}
+  }
+  function receiveRespawns(list){
+    syncRespMap();
+    if(!Array.isArray(list))return;
+    respPoints=list.filter(p=>p&&Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y)))
+      .map(p=>({x:Number(p.x),y:Number(p.y),id:p.id,nick:String(p.nick||'Heros'),lvl:p.lvl,wt:p.wt}));
+  }
+  function installRespHook(){
+    const mm=engine()?.miniMapController;
+    if(!mm||typeof mm.updateWindowMiniMapRespPos!=='function')return;
+    if(respHookTarget===mm&&mm.updateWindowMiniMapRespPos===respHookOriginal?.wrapped)return;
+    if(respHookTarget&&respHookOriginal&&respHookTarget.updateWindowMiniMapRespPos===respHookOriginal.wrapped)
+      respHookTarget.updateWindowMiniMapRespPos=respHookOriginal.fn;
+    const original=mm.updateWindowMiniMapRespPos;
+    const wrapped=function(list,...args){receiveRespawns(list);return original.call(this,list,...args)};
+    respHookTarget=mm;respHookOriginal={fn:original,wrapped};
+    mm.updateWindowMiniMapRespPos=wrapped;
+  }
+  function markNearbyRespawns(hero){
+    const hx=Number(hero?.x),hy=Number(hero?.y);
+    if(!Number.isFinite(hx)||!Number.isFinite(hy))return;
+    for(const p of respPoints){
+      // Odleglosc po osiach (Manhattan), bez twierdzenia ze gra potwierdzila resp.
+      if(Math.abs(hx-p.x)+Math.abs(hy-p.y)<=respRadius)
+        checkedResp.add(`${p.x}:${p.y}:${p.nick}:${p.id??''}`);
+    }
+  }
+  const respSyncTimer=setInterval(()=>{syncRespMap();installRespHook()},700);
+  installRespHook();
+
   const css=document.createElement("style");css.id="ta-mm-style";
   css.textContent=`
   #ta-mm{position:fixed;z-index:8500;width:280px;background:#0c181eea;color:#dceaf0;border:1px solid #286b76;
@@ -225,6 +268,8 @@
     }else if(type==="item"){
       subtitle=p.source==="recovery"?"Przedmiot odradzający się":"Przedmiot wyrzucony";
       src=imageUrl(raw?.i?.icon||d.icon||raw?.icon||raw?.getIcon?.());
+    }else if(type==="respawn"){
+      subtitle=`Respawn herosa${p.lvl?` • Poziom: ${p.lvl}`:""}${checkedResp.has(`${p.x}:${p.y}:${p.nick}:${p.id??''}`)?" • Sprawdzony":""}`;
     }else if(type==="gateway"){
       name=name||"Przejście";subtitle="Przejście na inną mapę";
     }
@@ -259,6 +304,7 @@
   }
   function paint(){
     if(!canvas||!frame?.isConnected)return;
+    syncRespMap();installRespHook();
     const d=data(),s=canvas.width,ms=mapSize(d);
     ctx.clearRect(0,0,s,s);ctx.fillStyle='#102027';ctx.fillRect(0,0,s,s);
     const w=ms.w,h=ms.h,valid=w>0&&h>0&&w<10000&&h<10000;
@@ -292,6 +338,21 @@
       if(cfg.labels&&p.name){ctx.font='10px Arial';ctx.fillStyle='#fff';ctx.fillText(p.name,x+radius+3,y-4)}
     };
     const m=getMarkers(d.e);
+    if(cfg.respawns!==false){
+      markNearbyRespawns(d.hero);
+      for(const p of respPoints){
+        const marker={...p,name:p.nick,kind:'respawn'};
+        mark(marker,color('respawn'),4,'respawn');
+        const key=`${p.x}:${p.y}:${p.nick}:${p.id??''}`;
+        if(checkedResp.has(key)){
+          const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
+          if(x>=0&&x<=s&&y>=0&&y<=s){
+            ctx.strokeStyle='#28aaff';ctx.lineWidth=2.5;
+            ctx.strokeRect(x-7,y-7,14,14);
+          }
+        }
+      }
+    }
     if(cfg.gates!==false)for(const v of m.gates)mark(v,color('gateway'),3.6,'gateway');
     if(cfg.objects)for(const v of m.objects)mark(v,color('object'),2.5,'object');
     if(cfg.npcs)for(const v of m.npcs)mark(v,color('npc'),3,'npc');
@@ -304,7 +365,7 @@
     }
     if(cfg.players)for(const v of m.players)mark(v,color('player'),3.5,'player');
     mark({...coord(d.hero),raw:{d:d.hero},kind:'hero'},color('hero'),5,'hero');
-    note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length}`:'Brak wymiarów mapy';
+    note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length} • respy: ${respPoints.length}`:'Brak wymiarów mapy';
     updatePreview();
     const footer=frame.querySelector('.footer');
     if(footer)footer.textContent=(d.mapName||'Margonem')+' • '+(d.hero?.x??'?')+','+(d.hero?.y??'?')+' • '+note+(terrain?' • teren: grafika':` • teren: ${bgState==='loading'?'ładowanie':bgState==='error'?'błąd':'siatka'}`);
@@ -374,6 +435,7 @@
       <label>Przedmioty (odradzające się i wyrzucone)<input type="checkbox" data-k="items" ${cfg.items!==false?"checked":""}></label>
       <label>Teren z grafiki mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
       <label>Obiekty interaktywne<input type="checkbox" data-k="objects" ${cfg.objects?"checked":""}></label>
+      <label>Respawny herosów (niebieska ramka po podejściu)<input type="checkbox" data-k="respawns" ${cfg.respawns!==false?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podgląd elementów po najechaniu<input type="checkbox" data-k="hoverPreview" ${cfg.hoverPreview!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
@@ -386,7 +448,7 @@
     };
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
-      for(const k of ["players","npcs","monsters","items","gates","labels","terrain","objects","hoverPreview"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(1100,Number(menu.querySelector('[data-k="size"]').value)||500));
        cfg.zoom=1;
       menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
@@ -406,7 +468,7 @@
     toggle();
   }
   document.addEventListener("keydown",onKeyDown,true);
-  function destroy(){document.removeEventListener("keydown",onKeyDown,true);closeView();css.remove();delete window.TeriashMinimapPlus}
+  function destroy(){clearInterval(respSyncTimer);if(respHookTarget&&respHookOriginal&&respHookTarget.updateWindowMiniMapRespPos===respHookOriginal.wrapped)respHookTarget.updateWindowMiniMapRespPos=respHookOriginal.fn;document.removeEventListener("keydown",onKeyDown,true);closeView();css.remove();delete window.TeriashMinimapPlus}
   function diagnostics(){
     const e=engine();const raw=safeDrawable(e?.npcs);
     const groups={};for(const o of raw){
@@ -415,12 +477,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.4',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.5',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.4'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.5'};
   if(cfg.visible)render();
 })();
