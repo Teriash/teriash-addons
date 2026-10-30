@@ -223,3 +223,7 @@ Zmiana wyłącznie rozmiaru i wizualnego położenia oryginalnego panelu. Bez pr
 - Korekta wewnętrznych kolumn logów przy zmniejszaniu panelu.
 - Po wykryciu końca walki przywrócenie natywnego układu (bez klikania lub ukrywania okna).
 - Zamykanie walki pozostaje obsługiwane przez Margonem.
+
+
+### v1.6.0 — Minimapa+ (eksperymentalna)
+Włącz w panelu TA. Przesuwaj za pasek tytułu; ustaw rozmiar w ⚙. Przycisk × ukrywa minimapę (nie wyłącza modułu). Widoczność i pozycja są zapamiętywane. Podgląd opiera się na natywnym canvas, jeśli istnieje; w przeciwnym razie wyświetlana jest orientacyjna siatka. Znaczniki siatki korzystają tylko z dostępnych danych klienta. Nie jest to jeszcze pełna mapa świata.

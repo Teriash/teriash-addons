@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.5.8",
+  "suiteVersion": "1.6.0",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -53,6 +53,16 @@
       "file": "addons/battle-logs.js",
       "defaultEnabled": false,
       "settingsGlobal": "TeriashBattleLogs",
+      "settingsMethod": "openSettings"
+    },
+    {
+      "id": "minimapPlus",
+      "name": "Minimapa+",
+      "description": "Osobna, przesuwalna minimapa z regulacją rozmiaru i podglądem mapy",
+      "version": "0.1.0",
+      "file": "addons/minimap-plus.js",
+      "defaultEnabled": false,
+      "settingsGlobal": "TeriashMinimapPlus",
       "settingsMethod": "openSettings"
     }
   ]
