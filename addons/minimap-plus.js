@@ -336,7 +336,11 @@
         for(let y=0;y<=h;y+=step){let py=oy+y*scale;ctx.moveTo(ox,py);ctx.lineTo(ox+w*scale,py)}ctx.stroke()}
     }
     hoverHits=[];
+    // Wielkosc znacznika rosnie wraz z wielkoscia pojedynczej kratki,
+    // ale pozostaje czytelna i nie zajmuje calej kratki na malych mapach.
+    const markerRadius=(base)=>Math.max(base,Math.min(base*1.85,scale*.34));
     const mark=(p,color,radius=3.6,type="object")=>{
+      radius=markerRadius(radius);
       if(!p)return;const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
       if(x<0||x>s||y<0||y>s)return;
       hoverHits.push({p,x,y,radius,type});
@@ -372,9 +376,10 @@
         const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
         if(x<0||x>s||y<0||y>s)continue;
         ctx.save();
-        ctx.strokeStyle='#64ffe9';ctx.lineWidth=Math.max(2,Math.min(4,scale*.35));
-        ctx.shadowColor='#64ffe9';ctx.shadowBlur=5;
-        const half=Math.max(7,Math.min(11,scale*.75));
+        // Ramka przylega do obwodu znacznika respa (bez duzego marginesu).
+        const half=markerRadius(4)+1.2;
+        ctx.strokeStyle='#64ffe9';ctx.lineWidth=2;
+        ctx.shadowColor='#64ffe9';ctx.shadowBlur=1;
         ctx.strokeRect(x-half,y-half,half*2,half*2);
         ctx.restore();
       }
