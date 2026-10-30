@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Teriash Addons
 // @namespace    https://margonem.pl/
-// @version      1.6.26
+// @version      1.6.28
 // @description  Panel i loader dodatków Teriash do Margonem
 // @author       Teriash
 // @updateURL    https://raw.githubusercontent.com/Teriash/teriash-addons/main/teriash-addons.user.js

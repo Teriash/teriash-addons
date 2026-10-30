@@ -113,14 +113,28 @@
   function respKey(p){
     return `${p.x}:${p.y}:${p.nick}:${p.id??''}`;
   }
-  function markNearbyRespawns(hero){
+  // Rzeczywisty heros w punkcie respu ma pierwszenstwo przed znacznikiem respu.
+  // Odczytujemy aktualne NPC z silnika, nie tylko z interpolowanego snapshotu.
+  function liveHeroesAtRespawns(e){
+    const occupied=new Set();
+    for(const o of safeDrawable(e?.npcs)){
+      const d=o?.d;if(!d)continue;
+      const wt=Number(o.getWt?.()??d.wt);
+      if(!Number.isFinite(wt)||wt<80||wt>=90)continue;
+      const x=Number(d.x),y=Number(d.y);
+      if(Number.isFinite(x)&&Number.isFinite(y))occupied.add(`${x}:${y}`);
+    }
+    return occupied;
+  }
+  function respHasHero(p,occupied){return occupied.has(`${p.x}:${p.y}`)}
+  function markNearbyRespawns(hero,occupied){
     const hx=Number(hero?.x),hy=Number(hero?.y);
     if(!Number.isFinite(hx)||!Number.isFinite(hy))return;
     // Jak w Gargonem: w jednym odswiezeniu oznacz tylko najblizszy
     // jeszcze niesprawdzony resp, w promieniu mniejszym niz 12 pol.
     let closest=null,closestDist=respRadiusSquared;
     for(const p of respPoints){
-      if(checkedResp.has(respKey(p)))continue;
+      if(checkedResp.has(respKey(p))||respHasHero(p,occupied))continue;
       const dx=p.x-hx,dy=p.y-hy,dist=dx*dx+dy*dy;
       if(dist<closestDist){closestDist=dist;closest=p}
     }
@@ -353,14 +367,14 @@
     if(!nearby.length){hidePreview();return}
     // The last drawn marker is on top; show it first when multiple overlap.
     nearby.reverse();const primary=nearby[0],key=nearby.map(h=>`${h.type}:${h.p.id??h.p.name}:${h.p.x}:${h.p.y}`).join("|");
-    if(key!==hoverKey){
+    if(key!==hoverKey || tip.style.display==="none" || tip.dataset.taCoordFormat!=="tuple"){
       hoverKey=key;const info=previewInfo(primary);
       const img=info.src?((primary.type==='player'||primary.type==='hero')
         ?`<div class="ta-outfit" style="background-image:url('${escapeHtml(info.src)}')"></div>`
         :`<img alt="" src="${escapeHtml(info.src)}" onerror="this.style.display='none'">`):"";
       const more=nearby.length>1?`<div class="ta-tip-list">W tym miejscu: ${nearby.length} elementy<br>${nearby.slice(1,5).map(h=>escapeHtml(h.p.name||h.type)).join(" · ")}</div>`:"";
       tip.innerHTML=`<div class="ta-tip-title">${escapeHtml(info.name)}</div><div class="ta-tip-sub">${escapeHtml(info.subtitle)}</div>${img}${more}`;
-      tip.style.display="block";
+      tip.style.display="block";tip.dataset.taCoordFormat="tuple";
     }
     movePreview(hoverPos.x,hoverPos.y);
   }
@@ -413,9 +427,11 @@
       for(const [key,state] of motion)if(now-state.seen>2000)motion.delete(key);
     }
     const m=markerSnapshot;
+    const occupiedHeroRespawns=liveHeroesAtRespawns(d.e);
     if(cfg.respawns!==false){
-      markNearbyRespawns(d.hero);
+      markNearbyRespawns(d.hero,occupiedHeroRespawns);
       for(const p of respPoints){
+        if(respHasHero(p,occupiedHeroRespawns))continue;
         const marker={...p,name:p.nick,kind:'respawn'};
         mark(marker,color('respawn'),4,'respawn');
       }
@@ -424,11 +440,17 @@
     if(cfg.objects)for(const v of m.objects)mark(v,color('object'),2.5,'object');
     if(cfg.npcs)for(const v of m.npcs)mark(v,color('npc'),3,'npc');
     if(cfg.monsters!==false)for(const v of m.monsters){
-      mark(v,color(v.monsterClass||'monsterNormal'),3.2,"monster");
+      if(!['monsterHero','monsterColossus','monsterTitan'].includes(v.monsterClass))
+        mark(v,color(v.monsterClass||'monsterNormal'),3.2,"monster");
     }
     if(cfg.items!==false)for(const v of m.items){
       const key=v.source==='recovery'?'itemRecovery':v.rarity==='legendary'?'itemLegendary':v.rarity==='heroic'?'itemHeroic':v.rarity==='unique'?'itemUnique':'itemNormal';
       mark(v,color(key),3,"item");
+    }
+    // Rangi heros/kolos/tytan sa rysowane nad innymi obiektami.
+    if(cfg.monsters!==false)for(const v of m.monsters){
+      if(['monsterHero','monsterColossus','monsterTitan'].includes(v.monsterClass))
+        mark(v,color(v.monsterClass),3.2,'monster');
     }
     if(cfg.players)for(const v of m.players)mark(smoothPosition(v,'player',now),color('player'),3.5,'player');
     const own=coord(d.hero);
@@ -437,7 +459,7 @@
     if(cfg.respawns!==false){
       for(const p of respPoints){
         const key=respKey(p);
-        if(!checkedResp.has(key))continue;
+        if(!checkedResp.has(key)||respHasHero(p,occupiedHeroRespawns))continue;
         const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
         if(x<0||x>s||y<0||y>s)continue;
         ctx.save();
@@ -563,12 +585,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.0',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.4',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.0'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.4'};
   if(cfg.visible)render();
 })();
