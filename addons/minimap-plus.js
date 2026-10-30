@@ -113,8 +113,13 @@
   document.head.appendChild(css);
   function save(){B.setValue(KEY,cfg)}
   const engine=()=>window.Engine;
-  respSyncTimer=setInterval(()=>{syncRespMap();installRespHook()},700);
-  installRespHook();
+  // Resp hook is optional: failure must never prevent Q or the minimap from loading.
+  function safeRespSync(){
+    try { syncRespMap(); installRespHook(); }
+    catch(err){ console.warn('[Minimapa+] Resp sync:',err); }
+  }
+  respSyncTimer=setInterval(safeRespSync,700);
+  try { safeRespSync(); } catch(err) { console.warn('[Minimapa+] Resp init:',err); }
   function data(){
     const e=engine(),m=e?.map;
     const d=m?.d||m?.data||{};
@@ -306,7 +311,7 @@
   }
   function paint(){
     if(!canvas||!frame?.isConnected)return;
-    syncRespMap();installRespHook();
+    safeRespSync();
     const d=data(),s=canvas.width,ms=mapSize(d);
     ctx.clearRect(0,0,s,s);ctx.fillStyle='#102027';ctx.fillRect(0,0,s,s);
     const w=ms.w,h=ms.h,valid=w>0&&h>0&&w<10000&&h<10000;
@@ -467,7 +472,8 @@
     if(!window.Engine)return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    toggle();
+    try { toggle(); }
+    catch(err) { console.error('[Minimapa+] Blad otwierania przez Q:',err); }
   }
   document.addEventListener("keydown",onKeyDown,true);
   function destroy(){clearInterval(respSyncTimer);if(respHookTarget&&respHookOriginal&&respHookTarget.updateWindowMiniMapRespPos===respHookOriginal.wrapped)respHookTarget.updateWindowMiniMapRespPos=respHookOriginal.fn;document.removeEventListener("keydown",onKeyDown,true);closeView();css.remove();delete window.TeriashMinimapPlus}
@@ -479,12 +485,15 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.6',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.7',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.6'};
-  if(cfg.visible)render();
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.7'};
+  if(cfg.visible){
+    try { render(); }
+    catch(err){ cfg.visible=false; console.error('[Minimapa+] Blad startu:',err); }
+  }
 })();
