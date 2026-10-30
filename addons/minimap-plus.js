@@ -2,7 +2,7 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:280,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:280,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="";
   const css=document.createElement("style");css.id="ta-mm-style";
@@ -97,20 +97,37 @@
   function safeDrawable(manager){
     try {const v=manager?.getDrawableList?.();return Array.isArray(v)?v:[]}catch{return []}
   }
+  function safeGroundItems(e){
+    try{const v=e?.map?.groundItems?.getDrawableItems?.();return Array.isArray(v)?v:[]}catch{return []}
+  }
   function getMarkers(e){
     const players=safeDrawable(e?.others).filter(o=>o?.isPlayer===true&&o?.d&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)))
       .map(o=>({...coord(o),id:o.d.id}));
-    const all=safeDrawable(e?.npcs).filter(o=>o?.d&&o?.getKind?.()==='npcs'&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)));
+    const all=safeDrawable(e?.npcs).filter(o=>o?.d&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)));
     const npcs=[],objects=[],monsters=[];
-    for(const o of all){const d=o.d,p=coord(o);if(!p)continue;
-      if(Number(d.lvl)>0){p.lvl=Number(d.lvl);p.wt=Number(d.wt)||0;monsters.push(p)}
-      else if(Number(d.type)===5)objects.push(p);
-      else if(Number(d.type)===0)npcs.push(p);
+    for(const o of all){
+      const d=o.d,p=coord(o);if(!p)continue;
+      let kind="";
+      try{kind=String(o.getKind?.()||"").toLowerCase()}catch{}
+      if(kind.includes("monster")||kind.includes("elite")||kind.includes("hero")||kind.includes("titan")){
+        p.lvl=Number(d.lvl)||0;p.kind=kind;monsters.push(p);
+      }else if(kind==="npcs"){
+        if(Number(d.type)===5)objects.push(p);
+        else if(Number(d.type)===0)npcs.push(p);
+      }
     }
+    const items=safeGroundItems(e).filter(o=>o?.canvasObjectType==="M_ITEM"&&o?.d)
+      .map(o=>{
+        const p=coord(o);if(!p)return null;
+        const tipClass=typeof o.tip?.[2]==="string"?o.tip[2].toLowerCase():"";
+        const rarity=tipClass.includes("leg")?"legendary":tipClass.includes("her")?"heroic":
+          tipClass.includes("uni")?"unique":"normal";
+        return {...p,rarity,id:o.d.id};
+      }).filter(Boolean);
     let gates=[];
     try{gates=e?.map?.getGateways?.()?.getList?.()||[]}catch{}
     gates=Array.isArray(gates)?gates.map(coord).filter(Boolean):[];
-    return {players,npcs,objects,monsters,gates};
+    return {players,npcs,objects,monsters,gates,items};
   }
   function paint(){
     if(!canvas||!frame?.isConnected)return;
@@ -147,10 +164,18 @@
     if(cfg.gates!==false)for(const v of m.gates)mark(v,'#ae83ff');
     if(cfg.objects)for(const v of m.objects)mark(v,'#9ba7ae',2.5);
     if(cfg.npcs)for(const v of m.npcs)mark(v,'#46d787',3);
-    if(cfg.npcs)for(const v of m.monsters)mark(v,v.wt>=2?'#ffbf47':'#ef5555',3.2);
+    if(cfg.monsters!==false)for(const v of m.monsters){
+      const k=v.kind;
+      const color=k.includes("titan")?'#e6a5ff':k.includes("hero")?'#ffd15a':k.includes("elite")?'#ffab47':'#ef5555';
+      mark(v,color,3.2);
+    }
+    if(cfg.items!==false)for(const v of m.items){
+      const color=v.rarity==='legendary'?'#ffd15a':v.rarity==='heroic'?'#58d7ff':v.rarity==='unique'?'#ff9b48':'#f1f5f9';
+      mark(v,color,3);
+    }
     if(cfg.players)for(const v of m.players)mark(v,'#63caff',3.5);
     mark(coord(d.hero),'#f9dd56',5);
-    note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length}`:'Brak wymiarów mapy';
+    note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length}`:'Brak wymiarów mapy';
     const footer=frame.querySelector('.footer');
     if(footer)footer.textContent=(d.mapName||'Margonem')+' • '+(d.hero?.x??'?')+','+(d.hero?.y??'?')+' • '+note+(terrain?' • teren: grafika':` • teren: ${bgState==='loading'?'ładowanie':bgState==='error'?'błąd':'siatka'}`);
   }
@@ -187,16 +212,18 @@
       <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="550" value="${cfg.size}"></label>
       <label>Powiększenie mapy<input type="number" data-k="zoom" min=".5" max="4" step=".2" value="${cfg.zoom}"></label>
       <label>Gracze (niebieskie kwadraty)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
-      <label>NPC i potwory<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
+      <label>NPC (zielone kwadraty)<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
+      <label>Potwory (czerwone kwadraty)<input type="checkbox" data-k="monsters" ${cfg.monsters!==false?"checked":""}></label>
+      <label>Przedmioty (kolor wg rzadkości)<input type="checkbox" data-k="items" ${cfg.items!==false?"checked":""}></label>
       <label>Teren z grafiki mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
       <label>Obiekty interaktywne<input type="checkbox" data-k="objects" ${cfg.objects?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <button data-a="save">Zapisz</button> <button data-a="close">Zamknij</button>
-      <p style="color:#9eb6bd;line-height:1.4">Teren jest pobierany bezpośrednio z Engine.map.src. Nie trzeba otwierać podręcznej mapy. Klasyfikacja elit jest wstępna.</p>`;
+      <p style="color:#9eb6bd;line-height:1.4">Teren jest pobierany bezpośrednio z Engine.map.src. Nie trzeba otwierać podręcznej mapy. Rozpoznawanie elit i rzadkości przedmiotów jest wstępne.</p>`;
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
-      for(const k of ["players","npcs","gates","labels","terrain","objects"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      for(const k of ["players","npcs","monsters","items","gates","labels","terrain","objects"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(550,Number(menu.querySelector('[data-k="size"]').value)||280));
       cfg.zoom=Math.max(.5,Math.min(4,Number(menu.querySelector('[data-k="zoom"]').value)||1));
       save();place();closeSettings();

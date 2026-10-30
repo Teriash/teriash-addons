@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.6.4",
+  "suiteVersion": "1.6.5",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -58,8 +58,8 @@
     {
       "id": "minimapPlus",
       "name": "Minimapa+",
-      "description": "Grafika terenu bezpośrednio z Engine.map.src i własne znaczniki graczy, NPC, potworów oraz przejść",
-      "version": "0.3.1",
+      "description": "Mapa z Engine.map.src, gracze, NPC, potwory, przejścia i przedmioty na ziemi",
+      "version": "0.3.2",
       "file": "addons/minimap-plus.js",
       "defaultEnabled": false,
       "settingsGlobal": "TeriashMinimapPlus",
