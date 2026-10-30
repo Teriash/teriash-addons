@@ -26,7 +26,7 @@
   function data(){
     const e=engine(),m=e?.map;
     const d=m?.d||m?.data||{};
-    const w=Number(d.x||d.width||m?.width||d.w||0),h=Number(d.y||d.height||m?.height||d.h||0);
+    const w=Number(d.x||d.width||m?.size?.x||m?.width||d.w||0),h=Number(d.y||d.height||m?.size?.y||m?.height||d.h||0);
     const hero=e?.hero?.d||{};
     return {w,h,hero,mapName:d.name||m?.name||"",e};
   }
@@ -51,8 +51,8 @@
   // canvas can return an entirely empty image. Read game state instead.
   function mapSize(d){
     const m=d.e?.map,raw=m?.d||{};
-    const w=Number(raw.x??raw.width??raw.w??m?.width??0);
-    const h=Number(raw.y??raw.height??raw.h??m?.height??0);
+    const w=Number(raw.x??raw.width??raw.w??m?.size?.x??m?.width??0);
+    const h=Number(raw.y??raw.height??raw.h??m?.size?.y??m?.height??0);
     return {w,h};
   }
   function rawList(source){
@@ -78,28 +78,21 @@
     }
     return out;
   }
-  function terrainSource(){
-    // Read the same image source as the native minimap, if it is an
-    // image/background element. Do not copy a blank WebGL canvas.
-    const els=[...document.querySelectorAll(
-      '.mini-map img,.mini-map-controller img,[class*="mini-map"] img,'+
-      '.mini-map [style*="background-image"],.mini-map-controller [style*="background-image"]'
-    )].filter(el=>!el.closest('#ta-mm'));
-    for(const el of els){
-      const url=el.tagName==='IMG'?el.currentSrc||el.src:
-        getComputedStyle(el).backgroundImage.match(/url\(["']?(.*?)["']?\)/)?.[1];
-      if(url&&url!=='none')return url;
-    }
-    return null;
-  }
-  let bgImage=null,bgUrl="",bgFailed=false;
-  function loadBackground(){
-    const url=terrainSource();
-    if(!url||url===bgUrl)return;
-    bgUrl=url;bgFailed=false;bgImage=new Image();
-    bgImage.onload=()=>{bgFailed=false};
-    bgImage.onerror=()=>{bgFailed=true;bgImage=null};
-    bgImage.src=url;
+  // Direct map artwork: never copy the native handheld minimap canvas.
+  // The native canvas includes the game's own dots and is only refreshed
+  // while the native map is open.
+  let bgImage=null,bgUrl="",bgState="none";
+  function loadBackground(e){
+    const url=typeof e?.map?.src==="string"?e.map.src:"";
+    if(url===bgUrl)return;
+    bgUrl=url;bgImage=null;bgState=url?"loading":"none";
+    if(!url)return;
+    const img=new Image();
+    // Do not set crossOrigin: drawImage can display CDN artwork without
+    // reading pixels. CORS failures would otherwise hide the image.
+    img.onload=()=>{if(bgUrl===url){bgImage=img;bgState="ready"}};
+    img.onerror=()=>{if(bgUrl===url){bgImage=null;bgState="error"}};
+    img.src=url;
   }
   function safeDrawable(manager){
     try {const v=manager?.getDrawableList?.();return Array.isArray(v)?v:[]}catch{return []}
@@ -127,15 +120,15 @@
     const scale=valid?Math.min(s/w,s/h)*cfg.zoom:Math.max(5,s/45)*cfg.zoom;
     const ox=valid?(s-w*scale)/2:s/2-(Number(d.hero.x)||0)*scale;
     const oy=valid?(s-h*scale)/2:s/2-(Number(d.hero.y)||0)*scale;
-    const native=document.querySelector('.handheld-window canvas.handheld-mini-map-canvas,canvas.handheld-mini-map-canvas');
+    loadBackground(d.e);
     let terrain=false;
-    if(cfg.terrain!==false&&native&&native!==canvas&&native.width>0&&native.height>0){
+    if(cfg.terrain!==false&&bgImage&&bgState==="ready"){
       try{
-        // Native handheld canvas contains terrain AND the game's original dots.
-        // Do not claim this is a clean terrain layer.
-        ctx.save();ctx.translate(s/2,s/2);ctx.scale(cfg.zoom,cfg.zoom);
-        ctx.drawImage(native,-s/2,-s/2,s,s);ctx.restore();terrain=true;
-      }catch{ctx.restore?.()}
+        // Map image spans the entire tile grid. Draw using the exact same
+        // tile-space transform as the custom markers (also when zoomed).
+        ctx.drawImage(bgImage,ox,oy,w*scale,h*scale);
+        terrain=true;
+      }catch(error){bgState="error";console.warn("[Minimapa+] Tło mapy:",error)}
     }
     if(!terrain){
       ctx.strokeStyle='#24424a';ctx.lineWidth=.7;
@@ -159,7 +152,7 @@
     mark(coord(d.hero),'#f9dd56',5);
     note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length}`:'Brak wymiarów mapy';
     const footer=frame.querySelector('.footer');
-    if(footer)footer.textContent=(d.mapName||'Margonem')+' • '+(d.hero?.x??'?')+','+(d.hero?.y??'?')+' • '+note+(terrain?' • teren: canvas':' • teren: siatka');
+    if(footer)footer.textContent=(d.mapName||'Margonem')+' • '+(d.hero?.x??'?')+','+(d.hero?.y??'?')+' • '+note+(terrain?' • teren: grafika':` • teren: ${bgState==='loading'?'ładowanie':bgState==='error'?'błąd':'siatka'}`);
   }
   function loop(){paint();raf=requestAnimationFrame(loop)}
   function place(){
@@ -195,12 +188,12 @@
       <label>Powiększenie mapy<input type="number" data-k="zoom" min=".5" max="4" step=".2" value="${cfg.zoom}"></label>
       <label>Gracze (niebieskie kwadraty)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
       <label>NPC i potwory<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
-      <label>Teren z podręcznej mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
+      <label>Teren z grafiki mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
       <label>Obiekty interaktywne<input type="checkbox" data-k="objects" ${cfg.objects?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <button data-a="save">Zapisz</button> <button data-a="close">Zamknij</button>
-      <p style="color:#9eb6bd;line-height:1.4">Oryginalny canvas zawiera również zielone kropki gry. Otwórz podręczną mapę, aby korzystać z jej obrazu. Klasyfikacja elit jest wstępna.</p>`;
+      <p style="color:#9eb6bd;line-height:1.4">Teren jest pobierany bezpośrednio z Engine.map.src. Nie trzeba otwierać podręcznej mapy. Klasyfikacja elit jest wstępna.</p>`;
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
       for(const k of ["players","npcs","gates","labels","terrain","objects"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
