@@ -42,6 +42,35 @@
 
   const engine=()=>window.Engine;
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
+  // 60 FPS renderowania; odczyt listy obiektow co 80 ms.
+  // Pozycje graczy interpolujemy pomiedzy kolejnymi odczytami.
+  let markerSnapshot=null,lastSampleAt=0,renderMapKey=null;
+  const motion=new Map();
+  const SAMPLE_MS=80, SMOOTH_MS=110;
+  function smoothPosition(p,kind,now){
+    if(!p)return p;
+    const id=p.id??p.raw?.d?.id;
+    if(id==null)return p;
+    const key=`${kind}:${id}`;
+    const x=Number(p.x),y=Number(p.y);
+    if(!Number.isFinite(x)||!Number.isFinite(y))return p;
+    let state=motion.get(key);
+    if(!state){state={fromX:x,fromY:y,toX:x,toY:y,start:now,seen:now};motion.set(key,state)}
+    else if(state.toX!==x||state.toY!==y){
+      const t=Math.max(0,Math.min(1,(now-state.start)/SMOOTH_MS));
+      const eased=t*t*(3-2*t);
+      const ix=state.fromX+(state.toX-state.fromX)*eased;
+      const iy=state.fromY+(state.toY-state.fromY)*eased;
+      // Teleporty i zmiany mapy bez przesuwania przez cala minimape.
+      if(Math.hypot(x-state.toX,y-state.toY)>8){state.fromX=x;state.fromY=y}
+      else {state.fromX=ix;state.fromY=iy}
+      state.toX=x;state.toY=y;state.start=now;
+    }
+    state.seen=now;
+    const t=Math.max(0,Math.min(1,(now-state.start)/SMOOTH_MS));
+    const eased=t*t*(3-2*t);
+    return {...p,x:state.fromX+(state.toX-state.fromX)*eased,y:state.fromY+(state.toY-state.fromY)*eased};
+  }
   let clickTransform=null;
   // Dane punktow respawnu pochodza z tego samego strumienia, co natywna minimapa.
   // Stan odwiedzenia istnieje tylko w pamieci i resetuje sie przy zmianie mapy.
@@ -309,9 +338,11 @@
     }
     movePreview(hoverPos.x,hoverPos.y);
   }
-  function paint(){
+  function paint(now=performance.now()){
     if(!canvas||!frame?.isConnected)return;
     syncRespMap();installRespHook();
+    const key=currentMapKey();
+    if(key!==renderMapKey){renderMapKey=key;markerSnapshot=null;motion.clear();lastSampleAt=0}
     const d=data(),s=canvas.width,ms=mapSize(d);
     ctx.clearRect(0,0,s,s);ctx.fillStyle='#102027';ctx.fillRect(0,0,s,s);
     const w=ms.w,h=ms.h,valid=w>0&&h>0&&w<10000&&h<10000;
@@ -338,7 +369,9 @@
     hoverHits=[];
     // Wielkosc znacznika rosnie wraz z wielkoscia pojedynczej kratki,
     // ale pozostaje czytelna i nie zajmuje calej kratki na malych mapach.
-    const markerRadius=(base)=>Math.max(base,Math.min(base*1.85,scale*.34));
+    // Na malych mapach kratki sa duze: ikony maja wyraznie rosnac,
+    // ale nie zaslaniac calej kratki. Rozmiar zalezy od skali mapy.
+    const markerRadius=(base)=>Math.max(base,Math.min(base*3.3,scale*.43));
     const mark=(p,color,radius=3.6,type="object")=>{
       radius=markerRadius(radius);
       if(!p)return;const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
@@ -348,7 +381,12 @@
       ctx.fillRect(x-radius,y-radius,2*radius,2*radius);ctx.strokeRect(x-radius,y-radius,2*radius,2*radius);
       if(cfg.labels&&p.name){ctx.font='10px Arial';ctx.fillStyle='#fff';ctx.fillText(p.name,x+radius+3,y-4)}
     };
-    const m=getMarkers(d.e);
+    if(!markerSnapshot||now-lastSampleAt>=SAMPLE_MS){
+      markerSnapshot=getMarkers(d.e);lastSampleAt=now;
+      // Usun nieobecne od dawna postacie, aby nie gromadzic wpisow.
+      for(const [key,state] of motion)if(now-state.seen>2000)motion.delete(key);
+    }
+    const m=markerSnapshot;
     if(cfg.respawns!==false){
       markNearbyRespawns(d.hero);
       for(const p of respPoints){
@@ -366,8 +404,9 @@
       const key=v.source==='recovery'?'itemRecovery':v.rarity==='legendary'?'itemLegendary':v.rarity==='heroic'?'itemHeroic':v.rarity==='unique'?'itemUnique':'itemNormal';
       mark(v,color(key),3,"item");
     }
-    if(cfg.players)for(const v of m.players)mark(v,color('player'),3.5,'player');
-    mark({...coord(d.hero),raw:{d:d.hero},kind:'hero'},color('hero'),5,'hero');
+    if(cfg.players)for(const v of m.players)mark(smoothPosition(v,'player',now),color('player'),3.5,'player');
+    const own=coord(d.hero);
+    if(own)mark(smoothPosition({...own,id:d.hero.id??'self',raw:{d:d.hero},kind:'hero'},'hero',now),color('hero'),5,'hero');
     // Rysuj ramki NA KONCU, aby NPC, przedmioty i gracze ich nie zaslaniali.
     if(cfg.respawns!==false){
       for(const p of respPoints){
@@ -390,10 +429,11 @@
     const footer=frame.querySelector('.footer');
     if(footer)footer.textContent=(d.mapName||'Margonem')+' • '+(d.hero?.x??'?')+','+(d.hero?.y??'?')+' • '+note+(terrain?' • teren: grafika':` • teren: ${bgState==='loading'?'ładowanie':bgState==='error'?'błąd':'siatka'}`);
   }
-  // Odczyt setek NPC co klatke nie jest potrzebny; 10 odswiezen/s wystarcza.
-  let lastPaintAt=0;
+  // requestAnimationFrame daje plynne odswiezanie (do 60 FPS),
+  // podczas gdy kosztowne pobieranie list pozostaje ograniczone do 80 ms.
   function loop(time){
-    if(time-lastPaintAt>=100){lastPaintAt=time;paint()}
+    if(!frame?.isConnected)return;
+    paint(time);
     raf=requestAnimationFrame(loop);
   }
   function place(){
@@ -440,7 +480,7 @@
     // Scroll nie zmienia skali mapy; rozmiar okna reguluje tylko opcja Rozmiar (px).
     place();loop();
   }
-  function closeView(){clickTransform=null;cancelAnimationFrame(raf);tip?.remove();tip=null;hoverPos=null;hoverHits=[];hoverKey="";frame?.remove();frame=null;canvas=null;ctx=null;closeSettings()}
+  function closeView(){markerSnapshot=null;motion.clear();lastSampleAt=0;clickTransform=null;cancelAnimationFrame(raf);tip?.remove();tip=null;hoverPos=null;hoverHits=[];hoverKey="";frame?.remove();frame=null;canvas=null;ctx=null;closeSettings()}
   function openSettings(){
     if(menu){closeSettings();return}
     menu=document.createElement("div");menu.id="ta-mm-settings";document.body.appendChild(menu);
@@ -497,12 +537,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.8',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.0',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.8'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.0'};
   if(cfg.visible)render();
 })();
