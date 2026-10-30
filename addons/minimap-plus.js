@@ -46,7 +46,7 @@
   // Dane punktow respawnu pochodza z tego samego strumienia, co natywna minimapa.
   // Stan odwiedzenia istnieje tylko w pamieci i resetuje sie przy zmianie mapy.
   let respMapKey=null,respPoints=[],checkedResp=new Set(),respHookTarget=null,respHookOriginal=null;
-  const respRadius=5;
+  const respRadius=5; // zasieg 5 kratek w kazdej osi (kwadrat 11x11)
   function currentMapKey(){
     const m=engine()?.map;
     if(!m)return null;
@@ -78,8 +78,8 @@
     const hx=Number(hero?.x),hy=Number(hero?.y);
     if(!Number.isFinite(hx)||!Number.isFinite(hy))return;
     for(const p of respPoints){
-      // Odleglosc po osiach (Manhattan), bez twierdzenia ze gra potwierdzila resp.
-      if(Math.abs(hx-p.x)+Math.abs(hy-p.y)<=respRadius)
+      // Odleglosc po kazdej osi (Chebyshev); znacznik oznacza odwiedzony obszar, nie potwierdzony spawn.
+      if(Math.max(Math.abs(hx-p.x),Math.abs(hy-p.y))<=respRadius)
         checkedResp.add(`${p.x}:${p.y}:${p.nick}:${p.id??''}`);
     }
   }
@@ -343,14 +343,6 @@
       for(const p of respPoints){
         const marker={...p,name:p.nick,kind:'respawn'};
         mark(marker,color('respawn'),4,'respawn');
-        const key=`${p.x}:${p.y}:${p.nick}:${p.id??''}`;
-        if(checkedResp.has(key)){
-          const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
-          if(x>=0&&x<=s&&y>=0&&y<=s){
-            ctx.strokeStyle='#28aaff';ctx.lineWidth=2.5;
-            ctx.strokeRect(x-7,y-7,14,14);
-          }
-        }
       }
     }
     if(cfg.gates!==false)for(const v of m.gates)mark(v,color('gateway'),3.6,'gateway');
@@ -365,6 +357,21 @@
     }
     if(cfg.players)for(const v of m.players)mark(v,color('player'),3.5,'player');
     mark({...coord(d.hero),raw:{d:d.hero},kind:'hero'},color('hero'),5,'hero');
+    // Rysuj ramki NA KONCU, aby NPC, przedmioty i gracze ich nie zaslaniali.
+    if(cfg.respawns!==false){
+      for(const p of respPoints){
+        const key=`${p.x}:${p.y}:${p.nick}:${p.id??''}`;
+        if(!checkedResp.has(key))continue;
+        const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
+        if(x<0||x>s||y<0||y>s)continue;
+        ctx.save();
+        ctx.strokeStyle='#18baff';ctx.lineWidth=3;
+        ctx.shadowColor='#009dff';ctx.shadowBlur=5;
+        ctx.strokeRect(x-8,y-8,16,16);
+        ctx.restore();
+      }
+    }
+
     note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length} • respy: ${respPoints.length}`:'Brak wymiarów mapy';
     updatePreview();
     const footer=frame.querySelector('.footer');
@@ -477,12 +484,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.4.6',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.4.7',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.6'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.4.7'};
   if(cfg.visible)render();
 })();
