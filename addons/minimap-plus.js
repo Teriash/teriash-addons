@@ -95,7 +95,12 @@
     img.src=url;
   }
   function safeDrawable(manager){
-    try {const v=manager?.getDrawableList?.();return Array.isArray(v)?v:[]}catch{return []}
+    try {
+      const v=manager?.getDrawableList?.();
+      if(Array.isArray(v))return v;
+      if(v && typeof v==='object')return Object.values(v);
+    }catch(error){console.warn('[Minimapa+] Lista obiektow:',error)}
+    return [];
   }
   function safeGroundItems(e){
     try{const v=e?.map?.groundItems?.getDrawableItems?.();return Array.isArray(v)?v:[]}catch{return []}
@@ -109,6 +114,7 @@
       const d=o.d,p=coord(o);if(!p)continue;
       let kind="";
       try{kind=String(o.getKind?.()||"").toLowerCase()}catch{}
+      // Nie filtruj po lvl: niektore prawdziwe potwory (np. Krabik) maja lvl=0.
       if(kind.includes("monster")||kind.includes("elite")||kind.includes("hero")||kind.includes("titan")){
         p.lvl=Number(d.lvl)||0;p.kind=kind;monsters.push(p);
       }else if(kind==="npcs"){
@@ -116,7 +122,8 @@
         else if(Number(d.type)===0)npcs.push(p);
       }
     }
-    const items=safeGroundItems(e).filter(o=>o?.canvasObjectType==="M_ITEM"&&o?.d)
+    const items=safeGroundItems(e).filter(o=>o?.d &&
+      (o.canvasObjectType==="M_ITEM" || o.getCanvasObjectType?.()==="M_ITEM"))
       .map(o=>{
         const p=coord(o);if(!p)return null;
         const tipClass=typeof o.tip?.[2]==="string"?o.tip[2].toLowerCase():"";
@@ -179,7 +186,12 @@
     const footer=frame.querySelector('.footer');
     if(footer)footer.textContent=(d.mapName||'Margonem')+' • '+(d.hero?.x??'?')+','+(d.hero?.y??'?')+' • '+note+(terrain?' • teren: grafika':` • teren: ${bgState==='loading'?'ładowanie':bgState==='error'?'błąd':'siatka'}`);
   }
-  function loop(){paint();raf=requestAnimationFrame(loop)}
+  // Odczyt setek NPC co klatke nie jest potrzebny; 10 odswiezen/s wystarcza.
+  let lastPaintAt=0;
+  function loop(time){
+    if(time-lastPaintAt>=100){lastPaintAt=time;paint()}
+    raf=requestAnimationFrame(loop);
+  }
   function place(){
     if(!frame)return;
     cfg.x=cfg.x==null?Math.max(5,innerWidth-cfg.size-300):Math.max(0,Math.min(innerWidth-cfg.size,cfg.x));
@@ -243,6 +255,20 @@
   }
   document.addEventListener("keydown",onKeyDown,true);
   function destroy(){document.removeEventListener("keydown",onKeyDown,true);closeView();css.remove();delete window.TeriashMinimapPlus}
-  window.TeriashMinimapPlus={openSettings,toggle,destroy};
+  function diagnostics(){
+    const e=engine();const raw=safeDrawable(e?.npcs);
+    const groups={};for(const o of raw){
+      if(!o?.d)continue;
+      let kind='BRAK';try{kind=String(o.getKind?.()||'BRAK')}catch{}
+      groups[kind]=(groups[kind]||0)+1;
+    }
+    const m=getMarkers(e);
+    const result={version:'0.3.3',map:e?.map?.d?.name,rawNpcs:raw.length,
+      groups,monsters:m.monsters.length,npcs:m.npcs.length,
+      groundItems:safeGroundItems(e).length,items:m.items.length};
+    console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
+    return result;
+  }
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.3.3'};
   if(cfg.visible)render();
 })();
