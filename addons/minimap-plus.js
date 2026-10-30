@@ -332,7 +332,7 @@
     const px=Number(position?.x??position?.rx??p.x);
     const py=Number(position?.y??position?.ry??p.y);
     if(Number.isFinite(px)&&Number.isFinite(py)){
-      const coords=`X: ${Number.isInteger(px)?px:px.toFixed(1)}, Y: ${Number.isInteger(py)?py:py.toFixed(1)}`;
+      const coords=`(${Number.isInteger(px)?px:px.toFixed(1)}, ${Number.isInteger(py)?py:py.toFixed(1)})`;
       subtitle=subtitle?`${subtitle} • ${coords}`:coords;
     }
     return {name,subtitle,src};
