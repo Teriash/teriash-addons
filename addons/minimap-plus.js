@@ -6,38 +6,45 @@
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
-  const DEFAULT_COLORS={hero:'#f9dd56',player:'#63caff',npc:'#46d787',object:'#9ba7ae',gateway:'#ae83ff',respawn:'#ffad4d',monsterNormal:'#ef5555',monsterElite:'#ff9b48',monsterElite2:'#ffdf55',monsterHero:'#a87bff',monsterTitan:'#f078df',itemRecovery:'#f3a74c',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
-  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
+  const DEFAULT_COLORS={hero:'#f9dd56',player:'#63caff',npc:'#46d787',object:'#9ba7ae',gateway:'#ae83ff',respawn:'#ffad4d',monsterNormal:'#ef5555',monsterElite:'#ff9b48',monsterElite2:'#ffdf55',monsterElite3:'#ffbb66',monsterColossus:'#e657ff',monsterHero:'#a87bff',monsterTitan:'#f078df',itemRecovery:'#f3a74c',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
+  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterElite3:'Elity III',monsterColossus:'Kolosy',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
   cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
   function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
-  // Potwierdzone w kodzie silnika Margonem: isEliteIIMob(t) sprawdza 19 < d.wt < 30.
-  // wt=2 (Slepa Strzala) jest zwyklym potworem, NIE elita.
-  // Pozostale wartosci wt nie maja jeszcze zweryfikowanego mapowania rang.
-  // Nie przypisujemy im elit/herosow/tytanow na podstawie zgadywanych numerow.
+  // Zrodlo: silnik Margonem, getDescriptionOfKindMonster(wt):
+  // >99 tytan, >89 kolos, >79 heros, >29 elita3, >19 elita2, >9 elita1.
+  // Wartosci 0..9 to zwykle potwory (np. Slepa Strzala wt=2).
   function monsterClass(o,kind){
     const d=o?.d||{};
     const raw=o?.getWt?.()??d.wt;
     const wt=raw===null||raw===undefined||raw===''?NaN:Number(raw);
-    if(Number.isInteger(wt)&&wt>19&&wt<30)return 'monsterElite2';
-    // Opcjonalne jawne etykiety rangi, jesli udostepni je silnik.
-    const label=String(d.rank??d.ranga??d.category??'').toLowerCase();
-    if(/(?:elite|elita)[ _-]?(?:ii|2)\b/.test(label))return 'monsterElite2';
+    if(Number.isFinite(wt)){
+      if(wt>99)return 'monsterTitan';
+      if(wt>89)return 'monsterColossus';
+      if(wt>79)return 'monsterHero';
+      if(wt>29)return 'monsterElite3';
+      if(wt>19)return 'monsterElite2';
+      if(wt>9)return 'monsterElite';
+      return 'monsterNormal';
+    }
+    const label=String(d.rank??d.ranga??d.category??kind??'').toLowerCase();
+    if(/kolos|colossus/.test(label))return 'monsterColossus';
     if(/titan|tytan/.test(label))return 'monsterTitan';
     if(/hero|heros/.test(label))return 'monsterHero';
+    if(/(?:elite|elita)[ _-]?(?:iii|3)\b/.test(label))return 'monsterElite3';
+    if(/(?:elite|elita)[ _-]?(?:ii|2)\b/.test(label))return 'monsterElite2';
     if(/elite|elita/.test(label))return 'monsterElite';
     return 'monsterNormal';
   }
   function isMonster(o,kind){
     const d=o?.d||{};
     const k=String(kind||'').toLowerCase();
-    // Elity II: silnik zwraca getKind()==='elita2', type===2 i wt 20..29.
-    // Sam typ 2 nie wystarcza do rozpoznania potwora.
     const wt=Number(o?.getWt?.()??d.wt);
+    // Silnik klasyfikuje rangi rowniez dla NPC typu 2, 3 i 9.
     return k.includes('monster')||k.includes('elite')||k.includes('elita')||
-      k.includes('hero')||k.includes('heros')||
-      k.includes('titan')||k.includes('tytan')||
+      k.includes('hero')||k.includes('heros')||k.includes('titan')||
+      k.includes('tytan')||k.includes('kolos')||k.includes('colossus')||
       Number(d.type)===3||
-      (Number(d.type)===2&&wt>=20&&wt<30);
+      ([2,9].includes(Number(d.type))&&Number.isFinite(wt)&&wt>9);
   }
 
   const engine=()=>window.Engine;
@@ -292,7 +299,7 @@
     const p=hit.p,raw=p.raw,d=raw?.d||{},type=hit.type;
     let name=p.name||d.nick||d.name||"Nieznany element",subtitle="",src="";
     if(type==="monster"){
-      const labels={monsterNormal:'Potwór',monsterElite:'Elita',monsterElite2:'Elita II',monsterHero:'Heros',monsterTitan:'Tytan'};
+      const labels={monsterNormal:'Potwór',monsterElite:'Elita',monsterElite2:'Elita II',monsterElite3:'Elita III',monsterColossus:'Kolos',monsterHero:'Heros',monsterTitan:'Tytan'};
       subtitle=[p.lvl?`Poziom: ${p.lvl}`:"",labels[p.monsterClass]||'Potwór'].filter(Boolean).join(" • ");
       src=imageUrl(d.icon||d.img||raw?.icon||raw?.getIcon?.());
     }else if(type==="npc"||type==="object"){
