@@ -2,7 +2,7 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:280,x:null,y:90,zoom:1,players:true,npcs:true,labels:false,gates:true};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:280,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="";
   const css=document.createElement("style");css.id="ta-mm-style";
@@ -101,54 +101,65 @@
     bgImage.onerror=()=>{bgFailed=true;bgImage=null};
     bgImage.src=url;
   }
+  function safeDrawable(manager){
+    try {const v=manager?.getDrawableList?.();return Array.isArray(v)?v:[]}catch{return []}
+  }
+  function getMarkers(e){
+    const players=safeDrawable(e?.others).filter(o=>o?.isPlayer===true&&o?.d&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)))
+      .map(o=>({...coord(o),id:o.d.id}));
+    const all=safeDrawable(e?.npcs).filter(o=>o?.d&&o?.getKind?.()==='npcs'&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)));
+    const npcs=[],objects=[],monsters=[];
+    for(const o of all){const d=o.d,p=coord(o);if(!p)continue;
+      if(Number(d.lvl)>0){p.lvl=Number(d.lvl);p.wt=Number(d.wt)||0;monsters.push(p)}
+      else if(Number(d.type)===5)objects.push(p);
+      else if(Number(d.type)===0)npcs.push(p);
+    }
+    let gates=[];
+    try{gates=e?.map?.getGateways?.()?.getList?.()||[]}catch{}
+    gates=Array.isArray(gates)?gates.map(coord).filter(Boolean):[];
+    return {players,npcs,objects,monsters,gates};
+  }
   function paint(){
     if(!canvas||!frame?.isConnected)return;
     const d=data(),s=canvas.width,ms=mapSize(d);
-    ctx.clearRect(0,0,s,s);
-    ctx.fillStyle="#102027";ctx.fillRect(0,0,s,s);
-    loadBackground();
+    ctx.clearRect(0,0,s,s);ctx.fillStyle='#102027';ctx.fillRect(0,0,s,s);
     const w=ms.w,h=ms.h,valid=w>0&&h>0&&w<10000&&h<10000;
     const scale=valid?Math.min(s/w,s/h)*cfg.zoom:Math.max(5,s/45)*cfg.zoom;
-    const ox=valid?(s-w*scale)/2: s/2-(Number(d.hero.x)||0)*scale;
-    const oy=valid?(s-h*scale)/2: s/2-(Number(d.hero.y)||0)*scale;
-    // Render native map image only when available. It may be a small
-    // cropped preview, so use it as a background rather than geometry.
-    if(bgImage?.complete&&bgImage.naturalWidth&&!bgFailed){
-      try{ctx.globalAlpha=.35;ctx.drawImage(bgImage,0,0,s,s);ctx.globalAlpha=1}catch{ctx.globalAlpha=1}
+    const ox=valid?(s-w*scale)/2:s/2-(Number(d.hero.x)||0)*scale;
+    const oy=valid?(s-h*scale)/2:s/2-(Number(d.hero.y)||0)*scale;
+    const native=document.querySelector('.handheld-window canvas.handheld-mini-map-canvas,canvas.handheld-mini-map-canvas');
+    let terrain=false;
+    if(cfg.terrain!==false&&native&&native!==canvas&&native.width>0&&native.height>0){
+      try{
+        // Native handheld canvas contains terrain AND the game's original dots.
+        // Do not claim this is a clean terrain layer.
+        ctx.save();ctx.translate(s/2,s/2);ctx.scale(cfg.zoom,cfg.zoom);
+        ctx.drawImage(native,-s/2,-s/2,s,s);ctx.restore();terrain=true;
+      }catch{ctx.restore?.()}
     }
-    ctx.strokeStyle="#24424a";ctx.lineWidth=.7;
-    const step=Math.max(1,Math.round(5/cfg.zoom));
-    if(valid){
-      const max=Math.min(w*h,120000);
-      if(max>0){
-        ctx.beginPath();
-        for(let x=0;x<=w;x+=step){const px=ox+x*scale;ctx.moveTo(px,oy);ctx.lineTo(px,oy+h*scale)}
-        for(let y=0;y<=h;y+=step){const py=oy+y*scale;ctx.moveTo(ox,py);ctx.lineTo(ox+w*scale,py)}
-        ctx.stroke();
-      }
-    }else{
-      for(let i=0;i<s;i+=20){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,s);ctx.moveTo(0,i);ctx.lineTo(s,i);ctx.stroke()}
+    if(!terrain){
+      ctx.strokeStyle='#24424a';ctx.lineWidth=.7;
+      if(valid){const step=Math.max(1,Math.round(5/cfg.zoom));ctx.beginPath();
+        for(let x=0;x<=w;x+=step){let px=ox+x*scale;ctx.moveTo(px,oy);ctx.lineTo(px,oy+h*scale)}
+        for(let y=0;y<=h;y+=step){let py=oy+y*scale;ctx.moveTo(ox,py);ctx.lineTo(ox+w*scale,py)}ctx.stroke()}
     }
-    const mark=(p,color,shape='square',radius=4)=>{
-      if(!p)return;
-      const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
+    const mark=(p,color,radius=3.6)=>{
+      if(!p)return;const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
       if(x<0||x>s||y<0||y>s)return;
-      ctx.fillStyle=color;ctx.strokeStyle="#081217";ctx.lineWidth=1.5;
-      ctx.beginPath();
-      if(shape==='circle')ctx.arc(x,y,radius,0,Math.PI*2);
-      else ctx.rect(x-radius,y-radius,radius*2,radius*2);
-      ctx.fill();ctx.stroke();
-      if(cfg.labels&&p.name){ctx.font="10px Arial";ctx.fillStyle="#fff";ctx.fillText(p.name,x+radius+3,y-4)}
+      ctx.fillStyle=color;ctx.strokeStyle='#081217';ctx.lineWidth=1.2;
+      ctx.fillRect(x-radius,y-radius,2*radius,2*radius);ctx.strokeRect(x-radius,y-radius,2*radius,2*radius);
+      if(cfg.labels&&p.name){ctx.font='10px Arial';ctx.fillStyle='#fff';ctx.fillText(p.name,x+radius+3,y-4)}
     };
-    const npc=collect(d.e,"npc"),players=collect(d.e,"player"),gates=collect(d.e,"gate");
-    if(cfg.gates!==false)for(const v of gates)mark(v,"#ae83ff","square",4);
-    if(cfg.npcs)for(const v of npc)mark(v,"#e97457","square",3);
-    if(cfg.players)for(const v of players)mark(v,"#63caff","circle",3.5);
-    mark(coord(d.hero),"#f9dd56","circle",5);
-    note=valid?`Mapa ${w}×${h} • NPC: ${npc.length} • gracze: ${players.length} • przejścia: ${gates.length}`:
-      "Brak rozmiaru mapy w Engine.map — tryb awaryjny";
-    const footer=frame.querySelector(".footer");
-    if(footer)footer.textContent=(d.mapName||"Margonem")+" • "+(d.hero?.x??"?")+","+(d.hero?.y??"?")+" • "+note;
+    const m=getMarkers(d.e);
+    if(cfg.gates!==false)for(const v of m.gates)mark(v,'#ae83ff');
+    if(cfg.objects)for(const v of m.objects)mark(v,'#9ba7ae',2.5);
+    if(cfg.npcs)for(const v of m.npcs)mark(v,'#46d787',3);
+    if(cfg.npcs)for(const v of m.monsters)mark(v,v.wt>=2?'#ffbf47':'#ef5555',3.2);
+    if(cfg.players)for(const v of m.players)mark(v,'#63caff',3.5);
+    mark(coord(d.hero),'#f9dd56',5);
+    note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length}`:'Brak wymiarów mapy';
+    const footer=frame.querySelector('.footer');
+    if(footer)footer.textContent=(d.mapName||'Margonem')+' • '+(d.hero?.x??'?')+','+(d.hero?.y??'?')+' • '+note+(terrain?' • teren: canvas':' • teren: siatka');
   }
   function loop(){paint();raf=requestAnimationFrame(loop)}
   function place(){
@@ -181,16 +192,18 @@
     menu.style.left=Math.max(10,Math.min(innerWidth-300,(cfg.x||100)+cfg.size+8))+"px";
     menu.innerHTML=`<strong>Minimapa+ — ustawienia</strong>
       <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="550" value="${cfg.size}"></label>
-      <label>Zoom siatki<input type="number" data-k="zoom" min=".5" max="4" step=".2" value="${cfg.zoom}"></label>
-      <label>Gracze (niebieskie kółka)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
-      <label>Potwory (pomarańczowe kwadraty)<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
+      <label>Powiększenie mapy<input type="number" data-k="zoom" min=".5" max="4" step=".2" value="${cfg.zoom}"></label>
+      <label>Gracze (niebieskie kwadraty)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
+      <label>NPC i potwory<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
+      <label>Teren z podręcznej mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
+      <label>Obiekty interaktywne<input type="checkbox" data-k="objects" ${cfg.objects?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <button data-a="save">Zapisz</button> <button data-a="close">Zamknij</button>
-      <p style="color:#9eb6bd;line-height:1.4">Mapa jest budowana ze współrzędnych udostępnionych przez klienta gry. Kolory i kształty znaczników są niezależne od oryginalnej minimapy. Jeżeli klient nie udostępnia danych przejść, nie pojawią się ich znaczniki.</p>`;
+      <p style="color:#9eb6bd;line-height:1.4">Oryginalny canvas zawiera również zielone kropki gry. Otwórz podręczną mapę, aby korzystać z jej obrazu. Klasyfikacja elit jest wstępna.</p>`;
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
-      for(const k of ["players","npcs","gates","labels"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      for(const k of ["players","npcs","gates","labels","terrain","objects"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(550,Number(menu.querySelector('[data-k="size"]').value)||280));
       cfg.zoom=Math.max(.5,Math.min(4,Number(menu.querySelector('[data-k="zoom"]').value)||1));
       save();place();closeSettings();
