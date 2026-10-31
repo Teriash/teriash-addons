@@ -297,10 +297,20 @@
     return entry;
   }
   function npcActions(o){
-    if(typeof o?.checkActionsBitByName!=='function')return [];
-    return NPC_ICON_ORDER.filter(action=>{
-      try{return !!o.checkActionsBitByName(action)}catch{return false}
-    });
+    // Margonem przechowuje znaczniki questow w qm i hasOnetimeQuest /
+    // hasDailyQuest, nawet kiedy d.actions === 0.
+    const active=new Set();
+    if(Array.isArray(o?.qm)){
+      for(const name of o.qm){if(NPC_ICON_FILES[name])active.add(name)}
+    }
+    if(typeof o?.checkActionsBitByName==='function'){
+      for(const action of NPC_ICON_ORDER){
+        try{if(o.checkActionsBitByName(action))active.add(action)}catch{}
+      }
+    }
+    try{if(o?.getHasOnetimeQuest?.()===true || o?.d?.hasOnetimeQuest===true)active.add('NORMAL_QUEST')}catch{}
+    try{if(o?.getHasDailyQuest?.()===true || o?.d?.hasDailyQuest===true)active.add('DAILY_QUEST')}catch{}
+    return NPC_ICON_ORDER.filter(action=>active.has(action));
   }
   function drawNpcIcons(npcs,ox,oy,scale,s){
     if(cfg.npcIcons===false)return;
@@ -339,8 +349,14 @@
         // Rosliny i inne przedmioty odradzajace sie sa obiektami NPC typu 7.
         recovery.push({...p,id:d.id,source:"recovery",rarity:"normal",kind:"item"});
       }else if(kind==="npcs"){
-        if(Number(d.type)===5)objects.push(p);
-        else if(Number(d.type)===0){p.npcActions=npcActions(o);npcs.push(p);}
+        const type=Number(d.type);
+        if(type===0 || type===5){
+          p.npcActions=npcActions(o);
+          // Obiekty interaktywne typu 5 (np. Biuletyn) tez moga miec quest.
+          // Zachowujemy ich oryginalna kategorie do podgladow i filtrow.
+          if(type===5){objects.push(p);if(p.npcActions.length)npcs.push(p)}
+          else npcs.push(p);
+        }
       }
     }
     const droppedItems=safeGroundItems(e).filter(o=>o?.d &&
@@ -707,12 +723,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.9',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.10',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.9'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.10'};
   if(cfg.visible)render();
 })();
