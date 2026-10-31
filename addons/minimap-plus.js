@@ -2,7 +2,7 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,colors:{}};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,colors:{}};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
@@ -260,6 +260,69 @@
   function safeGroundItems(e){
     try{const v=e?.map?.groundItems?.getDrawableItems?.();return Array.isArray(v)?v:[]}catch{return []}
   }
+  // Oryginalne znaczniki nad NPC. URL odczytywany z CSS Margonem;
+  // awaryjnie uzywamy znanych nazw grafik z katalogu gry.
+  const NPC_ICON_FILES={INKEEPER:'inn_mark.gif',AUCTION:'auctions_mark.gif',MAIL:'mail_mark.gif',
+    DEPO:'depo_mark.gif',DEPO_CLAN:'depo_mark.gif',SHOP:'shop_mark.gif',HEAL:'heal_mark.gif',
+    NORMAL_QUEST:'quest_mark.gif',DAILY_QUEST:'daily_quest_mark.gif'};
+  const NPC_ICON_ORDER=Object.keys(NPC_ICON_FILES);
+  const npcIconImages=new Map();
+  const npcIconUrls=new Map();
+  function npcIconUrl(action){
+    if(npcIconUrls.has(action))return npcIconUrls.get(action);
+    let url='';
+    try{
+      const probe=document.createElement('div');
+      probe.className='emo-npc-icon i-'+action;
+      probe.style.cssText='position:absolute;visibility:hidden;pointer-events:none';
+      document.body.appendChild(probe);
+      const bg=getComputedStyle(probe).backgroundImage;
+      probe.remove();
+      const match=bg.match(/url\(["']?([^"')]+)["']?\)/i);
+      if(match)url=match[1];
+    }catch{}
+    if(!url)url='https://micc.garmory-cdn.cloud/obrazki/interface/emo/'+NPC_ICON_FILES[action];
+    npcIconUrls.set(action,url);
+    return url;
+  }
+  function npcIconImage(action){
+    const url=npcIconUrl(action);
+    if(npcIconImages.has(url))return npcIconImages.get(url);
+    const img=new Image();
+    const entry={img,ready:false};
+    img.onload=()=>{entry.ready=true};
+    img.onerror=()=>{entry.ready=false};
+    img.src=url;
+    npcIconImages.set(url,entry);
+    return entry;
+  }
+  function npcActions(o){
+    if(typeof o?.checkActionsBitByName!=='function')return [];
+    return NPC_ICON_ORDER.filter(action=>{
+      try{return !!o.checkActionsBitByName(action)}catch{return false}
+    });
+  }
+  function drawNpcIcons(npcs,ox,oy,scale,s){
+    if(cfg.npcIcons===false)return;
+    const iconSize=Math.max(12,Math.min(25,scale*1.3));
+    for(const p of npcs){
+      const actions=p.npcActions||[];
+      if(!actions.length)continue;
+      const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
+      if(x<-iconSize||x>s+iconSize||y<-iconSize||y>s+iconSize)continue;
+      // Ikony nad kwadratem NPC; kilka funkcji rozstawiamy w jednym rzedzie.
+      const visible=actions.slice(0,4);
+      const step=iconSize*.78;
+      const start=x-(visible.length-1)*step/2;
+      visible.forEach((action,index)=>{
+        const entry=npcIconImage(action);
+        if(!entry.ready)return;
+        const cx=start+index*step;
+        const top=y-Math.max(3,Math.min(9,scale*.30))-iconSize;
+        ctx.drawImage(entry.img,cx-iconSize/2,top,iconSize,iconSize);
+      });
+    }
+  }
   function getMarkers(e){
     const players=safeDrawable(e?.others).filter(o=>o?.isPlayer===true&&o?.d&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)))
       .map(o=>({...coord(o),id:o.d.id,raw:o,kind:"player",lvl:o.d.lvl,prof:o.d.prof}));
@@ -277,7 +340,7 @@
         recovery.push({...p,id:d.id,source:"recovery",rarity:"normal",kind:"item"});
       }else if(kind==="npcs"){
         if(Number(d.type)===5)objects.push(p);
-        else if(Number(d.type)===0)npcs.push(p);
+        else if(Number(d.type)===0){p.npcActions=npcActions(o);npcs.push(p);}
       }
     }
     const droppedItems=safeGroundItems(e).filter(o=>o?.d &&
@@ -504,6 +567,8 @@
       if(['monsterHero','monsterColossus','monsterTitan'].includes(v.monsterClass))
         mark(v,color(v.monsterClass),3.2,'monster');
     }
+    // Specjalne ikony sa niezalezne od widocznosci zwyklych kwadratow NPC.
+    drawNpcIcons(m.npcs,ox,oy,scale,s);
     if(cfg.players)for(const v of m.players)mark(smoothPosition(v,'player',now),color('player'),3.5,'player');
     const own=coord(d.hero);
     if(own)mark(smoothPosition({...own,id:d.hero.id??'self',raw:{d:d.hero},kind:'hero'},'hero',now),color('hero'),5,'hero');
@@ -595,6 +660,7 @@
       <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="1100" value="${cfg.size}"></label>
       <label>Gracze (niebieskie kwadraty)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
       <label>NPC (zielone kwadraty)<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
+      <label>Znaczniki NPC (oryginalne ikony gry)<input type="checkbox" data-k="npcIcons" ${cfg.npcIcons!==false?"checked":""}></label>
       <label>Potwory (czerwone kwadraty)<input type="checkbox" data-k="monsters" ${cfg.monsters!==false?"checked":""}></label>
       <label>Przedmioty (odradzające się i wyrzucone)<input type="checkbox" data-k="items" ${cfg.items!==false?"checked":""}></label>
       <label>Teren z grafiki mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
@@ -612,7 +678,7 @@
     };
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
-      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview","npcIcons"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(1100,Number(menu.querySelector('[data-k="size"]').value)||500));
        cfg.zoom=1;
       menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
@@ -641,12 +707,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.8',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.9',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.8'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.9'};
   if(cfg.visible)render();
 })();
