@@ -351,6 +351,49 @@
     }
     return {name,subtitle,src};
   }
+  // Menu kontekstowe gracza: natywny popup Margonem, jak w Klanowicze Online.
+  function playerAtPointer(event){
+    if(!canvas)return null;
+    const rect=canvas.getBoundingClientRect();
+    if(!rect.width||!rect.height)return null;
+    const x=(event.clientX-rect.left)*canvas.width/rect.width;
+    const y=(event.clientY-rect.top)*canvas.height/rect.height;
+    // Sprawdzamy tylko znaczniki graczy, nie potwory ani NPC.
+    const hits=hoverHits.filter(h=>h.type==='player' && Math.hypot(h.x-x,h.y-y)<=Math.max(6,h.radius+3));
+    return hits.length?hits[hits.length-1].p:null;
+  }
+  function showPlayerMenu(player,event){
+    const eng=engine();
+    if(!player||typeof eng?.interface?.showPopupMenu!=='function')return;
+    const d=player.raw?.d||{};
+    const nick=String(d.nick||player.name||'').trim();
+    const id=Number(d.id??player.id)||0;
+    if(!nick)return;
+    const accountId=Number(player.raw?.getAccountId?.()||d.account||d.accountId||0)||0;
+    const actions=[];
+    actions.push(['Wyślij wiadomość',()=>eng.chatController?.getChatInputWrapper?.().setPrivateMessageProcedure(nick)]);
+    if(id&&typeof eng.showEqManager?.update==='function'){
+      actions.push(['Pokaż ekwipunek',()=>eng.showEqManager.update({
+        id,account:accountId,lvl:Number(d.lvl)||0,nick,prof:String(d.prof||''),
+        icon:String(d.outfit||d.icon||''),world:eng.worldConfig?.getWorldName?.()
+      })]);
+    }
+    const encodedNick=nick.split(' ').join('_');
+    actions.push(['Zaproś do przyjaciół',()=>window._g?.(`friends&a=finvite&nick=${encodedNick}`)]);
+    actions.push(['Dodaj do wrogów',()=>window._g?.(`friends&a=eadd&nick=${encodedNick}`)]);
+    if(id)actions.push(['Zaproś do grupy',()=>window._g?.(`party&a=inv&id=${id}`)]);
+    if(accountId&&id&&typeof eng.iframeWindowManager?.newPlayerProfile==='function'){
+      actions.push(['Pokaż profil',()=>eng.iframeWindowManager.newPlayerProfile({accountId,characterId:id})]);
+    }
+    event.preventDefault();event.stopPropagation();
+    eng.interface.showPopupMenu(actions,event,{header:nick});
+    requestAnimationFrame(()=>{
+      document.querySelectorAll('.popup-menu-layer').forEach(layer=>{
+        if(layer.querySelector('.popup-menu.show'))
+          layer.style.setProperty('z-index','2147483640','important');
+      });
+    });
+  }
   function hidePreview(){if(tip)tip.style.display="none";hoverKey=""}
   function movePreview(x,y){
     if(!tip||tip.style.display==="none")return;
@@ -504,6 +547,10 @@
     tip=document.createElement("div");tip.id="ta-mm-preview";document.body.appendChild(tip);
     canvas.addEventListener("pointermove",e=>{hoverPos={x:e.clientX,y:e.clientY};updatePreview()});
     canvas.addEventListener("pointerleave",()=>{hoverPos=null;hidePreview()});
+    canvas.addEventListener('contextmenu',event=>{
+      const player=playerAtPointer(event);
+      if(player)showPlayerMenu(player,event);
+    });
     // Use exactly the same tile-space transform as paint(), including zoom.
     canvas.addEventListener("click",e=>{
       if(e.button!==0||!clickTransform)return;
@@ -586,12 +633,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.6',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.7',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.6'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.7'};
   if(cfg.visible)render();
 })();

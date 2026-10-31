@@ -1,5 +1,5 @@
 {
-  "suiteVersion": "1.6.30",
+  "suiteVersion": "1.6.31",
   "addons": [
     {
       "id": "legendaryPulse",
@@ -59,7 +59,7 @@
       "id": "minimapPlus",
       "name": "Minimapa+",
       "description": "Mapa terenu, NPC, potwory (takze lvl 0), gracze, przejscia i przedmioty lezace na ziemi",
-      "version": "0.5.6",
+      "version": "0.5.7",
       "file": "addons/minimap-plus.js",
       "defaultEnabled": false,
       "settingsGlobal": "TeriashMinimapPlus",
