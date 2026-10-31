@@ -372,7 +372,8 @@
       const img=info.src?((primary.type==='player'||primary.type==='hero')
         ?`<div class="ta-outfit" style="background-image:url('${escapeHtml(info.src)}')"></div>`
         :`<img alt="" src="${escapeHtml(info.src)}" onerror="this.style.display='none'">`):"";
-      const more=nearby.length>1 && primary.type!=="gateway" && primary.type!=="monster"?`<div class="ta-tip-list">W tym miejscu: ${nearby.length} elementy<br>${nearby.slice(1,5).map(h=>escapeHtml(h.p.name||h.type)).join(" · ")}</div>`:"";
+      const nearbyPlayers=nearby.filter(h=>h.type==="player");
+      const more=primary.type==="player" && nearbyPlayers.length>1?`<div class="ta-tip-list">W tym miejscu: ${nearbyPlayers.length} graczy<br>${nearbyPlayers.filter(h=>h!==primary).slice(0,4).map(h=>escapeHtml(h.p.name||h.type)).join(" · ")}</div>`:"";
       tip.innerHTML=`<div class="ta-tip-title">${escapeHtml(info.name)}</div><div class="ta-tip-sub">${escapeHtml(info.subtitle)}</div>${img}${more}`;
       tip.style.display="block";tip.dataset.taCoordFormat="tuple";
     }
@@ -585,12 +586,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.5',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.6',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.5'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.6'};
   if(cfg.visible)render();
 })();
