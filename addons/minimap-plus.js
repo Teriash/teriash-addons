@@ -49,11 +49,11 @@
 
   const engine=()=>window.Engine;
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
-  // 60 FPS renderowania; odczyt listy obiektow co 80 ms.
-  // Pozycje graczy interpolujemy pomiedzy kolejnymi odczytami.
+  // Render do 60 FPS. Probkowanie obiektow czesciej, bez czekania na
+  // pelny krok animacji. Ruch jest animowany w pikselach, nie skokowo po kratkach.
   let markerSnapshot=null,lastSampleAt=0,renderMapKey=null;
   const motion=new Map();
-  const SAMPLE_MS=80, SMOOTH_MS=110;
+  const SAMPLE_MS=35, MOVE_MS=165;
   function smoothPosition(p,kind,now){
     if(!p)return p;
     const id=p.id??p.raw?.d?.id;
@@ -62,21 +62,29 @@
     const x=Number(p.x),y=Number(p.y);
     if(!Number.isFinite(x)||!Number.isFinite(y))return p;
     let state=motion.get(key);
-    if(!state){state={fromX:x,fromY:y,toX:x,toY:y,start:now,seen:now};motion.set(key,state)}
-    else if(state.toX!==x||state.toY!==y){
-      const t=Math.max(0,Math.min(1,(now-state.start)/SMOOTH_MS));
-      const eased=t*t*(3-2*t);
-      const ix=state.fromX+(state.toX-state.fromX)*eased;
-      const iy=state.fromY+(state.toY-state.fromY)*eased;
-      // Teleporty i zmiany mapy bez przesuwania przez cala minimape.
-      if(Math.hypot(x-state.toX,y-state.toY)>8){state.fromX=x;state.fromY=y}
-      else {state.fromX=ix;state.fromY=iy}
-      state.toX=x;state.toY=y;state.start=now;
+    if(!state){
+      state={x,y,fromX:x,fromY:y,toX:x,toY:y,start:now,seen:now};
+      motion.set(key,state);
+    }else{
+      // Oblicz pozycje posrednia ZANIM wyznaczymy nowy cel.
+      // Animacja liniowa nie zatrzymuje sie na kazdej kratce.
+      const progress=Math.max(0,Math.min(1,(now-state.start)/MOVE_MS));
+      state.x=state.fromX+(state.toX-state.fromX)*progress;
+      state.y=state.fromY+(state.toY-state.fromY)*progress;
+      if(state.toX!==x||state.toY!==y){
+        // Duze skoki (teleport, zmiana lokacji) nie sa animowane.
+        if(Math.hypot(x-state.toX,y-state.toY)>8){
+          state.x=x;state.y=y;state.fromX=x;state.fromY=y;
+        }else{
+          state.fromX=state.x;state.fromY=state.y;
+        }
+        state.toX=x;state.toY=y;state.start=now;
+      }
+      state.seen=now;
     }
-    state.seen=now;
-    const t=Math.max(0,Math.min(1,(now-state.start)/SMOOTH_MS));
-    const eased=t*t*(3-2*t);
-    return {...p,x:state.fromX+(state.toX-state.fromX)*eased,y:state.fromY+(state.toY-state.fromY)*eased};
+    const t=Math.max(0,Math.min(1,(now-state.start)/MOVE_MS));
+    return {...p,x:state.fromX+(state.toX-state.fromX)*t,
+                 y:state.fromY+(state.toY-state.fromY)*t};
   }
   let clickTransform=null;
   // Dane punktow respawnu pochodza z tego samego strumienia, co natywna minimapa.
@@ -633,12 +641,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.7',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.8',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.7'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.8'};
   if(cfg.visible)render();
 })();
