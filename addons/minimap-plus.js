@@ -579,7 +579,7 @@
     movePreview(hoverPos.x,hoverPos.y);
   }
   // Obszar mgly wojny z parametru visibility mapy, a nie z granic kamery.
-  // WarShadow dodaje 2 kratki marginesu jedynie do maski renderowania.
+  // Ramka obejmuje takze 2 kratki marginesu maski WarShadow.
   function getWarFogBounds(map,w,h){
     const engine=window.Engine||window.TeriashAddons?.bridge?.engine;
     const war=engine?.warShadow;
@@ -588,9 +588,10 @@
     const hero=engine?.hero;
     const hx=Number(hero?.rx??hero?.d?.x),hy=Number(hero?.ry??hero?.d?.y);
     if(!Number.isFinite(hx)||!Number.isFinite(hy))return null;
-    // Rzeczywisty promien visibility, bez technicznego marginesu maski.
-    const x1=Math.max(0,hx-visibility),y1=Math.max(0,hy-visibility);
-    const x2=Math.min(w,hx+visibility),y2=Math.min(h,hy+visibility);
+    // Promien z marginesem silnika (np. visibility=16 -> 18 kratek).
+    const radius=Math.max(visibility,Number(war.warRangeAndMargin)||visibility);
+    const x1=Math.max(0,hx-radius),y1=Math.max(0,hy-radius);
+    const x2=Math.min(w,hx+radius),y2=Math.min(h,hy+radius);
     return x2>x1&&y2>y1?{x1,y1,x2,y2}:null;
   }
   function drawWarFogDim(map,ox,oy,scale,w,h){
@@ -836,12 +837,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.16',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.17',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.16'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.17'};
   if(cfg.visible)render();
 })();
