@@ -2,7 +2,7 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,colors:{}};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,visibilityFrame:false,visibilityDim:false,colors:{}};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
@@ -578,6 +578,40 @@
     }
     movePreview(hoverPos.x,hoverPos.y);
   }
+  // Ramka aktualnego widoku kamery (nie jest potwierdzonym zasiegiem spawnu potworow).
+  // Granice pochodza bezposrednio z silnika, w jednostkach kratek mapy.
+  function drawCameraVisibility(map,ox,oy,scale,w,h){
+    if(!cfg.visibilityFrame || !map)return;
+    const bounds=[map.getMinX?.(),map.getMinY?.(),map.getMaxX?.(),map.getMaxY?.()].map(Number);
+    if(!bounds.every(Number.isFinite))return;
+    let [minX,minY,maxX,maxY]=bounds;
+    minX=Math.max(0,Math.min(w,minX));maxX=Math.max(0,Math.min(w,maxX));
+    minY=Math.max(0,Math.min(h,minY));maxY=Math.max(0,Math.min(h,maxY));
+    if(maxX<=minX||maxY<=minY)return;
+    const left=ox+minX*scale,top=oy+minY*scale;
+    const width=(maxX-minX)*scale,height=(maxY-minY)*scale;
+    ctx.save();
+    // Cieniowanie dotyczy wylacznie grafiki mapy; znaczniki pozostaja czytelne.
+    if(cfg.visibilityDim){
+      ctx.fillStyle='rgba(3,10,18,.48)';
+      ctx.beginPath();ctx.rect(ox,oy,w*scale,h*scale);
+      ctx.rect(left,top,width,height);
+      ctx.fill('evenodd');
+    }
+    ctx.restore();
+  }
+  function drawCameraVisibilityBorder(map,ox,oy,scale,w,h){
+    if(!cfg.visibilityFrame||!map)return;
+    const a=[map.getMinX?.(),map.getMinY?.(),map.getMaxX?.(),map.getMaxY?.()].map(Number);
+    if(!a.every(Number.isFinite))return;
+    const x1=Math.max(0,Math.min(w,a[0])),y1=Math.max(0,Math.min(h,a[1]));
+    const x2=Math.max(0,Math.min(w,a[2])),y2=Math.max(0,Math.min(h,a[3]));
+    if(x2<=x1||y2<=y1)return;
+    ctx.save();ctx.beginPath();ctx.rect(ox,oy,w*scale,h*scale);ctx.clip();
+    ctx.strokeStyle='#ffe45a';ctx.lineWidth=2;ctx.shadowColor='#ffd74a';ctx.shadowBlur=3;
+    ctx.strokeRect(ox+x1*scale,oy+y1*scale,(x2-x1)*scale,(y2-y1)*scale);
+    ctx.restore();
+  }
   function paint(now=performance.now()){
     if(!canvas||!frame?.isConnected)return;
     syncRespMap();installRespHook();
@@ -606,6 +640,7 @@
         for(let x=0;x<=w;x+=step){let px=ox+x*scale;ctx.moveTo(px,oy);ctx.lineTo(px,oy+h*scale)}
         for(let y=0;y<=h;y+=step){let py=oy+y*scale;ctx.moveTo(ox,py);ctx.lineTo(ox+w*scale,py)}ctx.stroke()}
     }
+    drawCameraVisibility(d.e?.map,ox,oy,scale,w,h);
     hoverHits=[];
     // Wielkosc znacznika rosnie wraz z wielkoscia pojedynczej kratki,
     // ale pozostaje czytelna i nie zajmuje calej kratki na malych mapach.
@@ -674,6 +709,7 @@
       }
     }
 
+    drawCameraVisibilityBorder(d.e?.map,ox,oy,scale,w,h);
     note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length} • respy: ${respPoints.length}`:'Brak wymiarów mapy';
     updatePreview();
     const footer=frame.querySelector('.footer');
@@ -753,6 +789,8 @@
       <label>Respawny herosów (turkusowa ramka po podejściu)<input type="checkbox" data-k="respawns" ${cfg.respawns!==false?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podgląd elementów po najechaniu<input type="checkbox" data-k="hoverPreview" ${cfg.hoverPreview!==false?"checked":""}></label>
+      <label>Żółta ramka widoku kamery<input type="checkbox" data-k="visibilityFrame" ${cfg.visibilityFrame?"checked":""}></label>
+      <label>Przyciemnij poza ramką<input type="checkbox" data-k="visibilityDim" ${cfg.visibilityDim?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div>
       <button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
@@ -763,7 +801,7 @@
     };
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
-      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview","npcIcons"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview","npcIcons","visibilityFrame","visibilityDim"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(1100,Number(menu.querySelector('[data-k="size"]').value)||500));
        cfg.zoom=1;
       menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
@@ -792,12 +830,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.12',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.13',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.12'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.13'};
   if(cfg.visible)render();
 })();
