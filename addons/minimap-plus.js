@@ -578,37 +578,39 @@
     }
     movePreview(hoverPos.x,hoverPos.y);
   }
-  // Ramka aktualnego widoku kamery (nie jest potwierdzonym zasiegiem spawnu potworow).
-  // Granice pochodza bezposrednio z silnika, w jednostkach kratek mapy.
-  function drawCameraVisibility(map,ox,oy,scale,w,h){
-    if(!cfg.visibilityFrame || !map)return;
-    const bounds=[map.getMinX?.(),map.getMinY?.(),map.getMaxX?.(),map.getMaxY?.()].map(Number);
-    if(!bounds.every(Number.isFinite))return;
-    let [minX,minY,maxX,maxY]=bounds;
-    minX=Math.max(0,Math.min(w,minX));maxX=Math.max(0,Math.min(w,maxX));
-    minY=Math.max(0,Math.min(h,minY));maxY=Math.max(0,Math.min(h,maxY));
-    if(maxX<=minX||maxY<=minY)return;
-    const left=ox+minX*scale,top=oy+minY*scale;
-    const width=(maxX-minX)*scale,height=(maxY-minY)*scale;
-    ctx.save();
-    // Cieniowanie dotyczy wylacznie grafiki mapy; znaczniki pozostaja czytelne.
-    if(cfg.visibilityDim){
-      ctx.fillStyle='rgba(3,10,18,.48)';
-      ctx.beginPath();ctx.rect(ox,oy,w*scale,h*scale);
-      ctx.rect(left,top,width,height);
-      ctx.fill('evenodd');
-    }
-    ctx.restore();
+  // Obszar mgly wojny z parametru visibility mapy, a nie z granic kamery.
+  // WarShadow dodaje 2 kratki marginesu jedynie do maski renderowania.
+  function getWarFogBounds(map,w,h){
+    const engine=window.Engine||window.TeriashAddons?.bridge?.engine;
+    const war=engine?.warShadow;
+    const visibility=Number(map?.d?.visibility);
+    if(!Number.isFinite(visibility)||visibility<=0||!war||war.canDraw!==true)return null;
+    const hero=engine?.hero;
+    const hx=Number(hero?.rx??hero?.d?.x),hy=Number(hero?.ry??hero?.d?.y);
+    if(!Number.isFinite(hx)||!Number.isFinite(hy))return null;
+    // Rzeczywisty promien visibility, bez technicznego marginesu maski.
+    const x1=Math.max(0,hx-visibility),y1=Math.max(0,hy-visibility);
+    const x2=Math.min(w,hx+visibility),y2=Math.min(h,hy+visibility);
+    return x2>x1&&y2>y1?{x1,y1,x2,y2}:null;
   }
-  function drawCameraVisibilityBorder(map,ox,oy,scale,w,h){
-    if(!cfg.visibilityFrame||!map)return;
-    const a=[map.getMinX?.(),map.getMinY?.(),map.getMaxX?.(),map.getMaxY?.()].map(Number);
-    if(!a.every(Number.isFinite))return;
-    const x1=Math.max(0,Math.min(w,a[0])),y1=Math.max(0,Math.min(h,a[1]));
-    const x2=Math.max(0,Math.min(w,a[2])),y2=Math.max(0,Math.min(h,a[3]));
-    if(x2<=x1||y2<=y1)return;
+  function drawWarFogDim(map,ox,oy,scale,w,h){
+    if(!cfg.visibilityFrame||!cfg.visibilityDim)return;
+    const bounds=getWarFogBounds(map,w,h);
+    if(!bounds)return;
+    const {x1,y1,x2,y2}=bounds;
+    ctx.save();ctx.fillStyle='rgba(3,10,18,.48)';
+    ctx.beginPath();ctx.rect(ox,oy,w*scale,h*scale);
+    ctx.rect(ox+x1*scale,oy+y1*scale,(x2-x1)*scale,(y2-y1)*scale);
+    ctx.fill('evenodd');ctx.restore();
+  }
+  function drawWarFogBorder(map,ox,oy,scale,w,h){
+    if(!cfg.visibilityFrame)return;
+    const bounds=getWarFogBounds(map,w,h);
+    if(!bounds)return;
+    const {x1,y1,x2,y2}=bounds;
     ctx.save();ctx.beginPath();ctx.rect(ox,oy,w*scale,h*scale);ctx.clip();
-    ctx.strokeStyle='#ffe45a';ctx.lineWidth=2;ctx.shadowColor='#ffd74a';ctx.shadowBlur=3;
+    ctx.strokeStyle='#ffe45a';ctx.lineWidth=2;
+    ctx.shadowColor='#ffd74a';ctx.shadowBlur=3;
     ctx.strokeRect(ox+x1*scale,oy+y1*scale,(x2-x1)*scale,(y2-y1)*scale);
     ctx.restore();
   }
@@ -640,7 +642,7 @@
         for(let x=0;x<=w;x+=step){let px=ox+x*scale;ctx.moveTo(px,oy);ctx.lineTo(px,oy+h*scale)}
         for(let y=0;y<=h;y+=step){let py=oy+y*scale;ctx.moveTo(ox,py);ctx.lineTo(ox+w*scale,py)}ctx.stroke()}
     }
-    drawCameraVisibility(d.e?.map,ox,oy,scale,w,h);
+    drawWarFogDim(d.e?.map,ox,oy,scale,w,h);
     hoverHits=[];
     // Wielkosc znacznika rosnie wraz z wielkoscia pojedynczej kratki,
     // ale pozostaje czytelna i nie zajmuje calej kratki na malych mapach.
@@ -709,7 +711,7 @@
       }
     }
 
-    drawCameraVisibilityBorder(d.e?.map,ox,oy,scale,w,h);
+    drawWarFogBorder(d.e?.map,ox,oy,scale,w,h);
     note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length} • respy: ${respPoints.length}`:'Brak wymiarów mapy';
     updatePreview();
     const footer=frame.querySelector('.footer');
@@ -789,7 +791,7 @@
       <label>Respawny herosów (turkusowa ramka po podejściu)<input type="checkbox" data-k="respawns" ${cfg.respawns!==false?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podgląd elementów po najechaniu<input type="checkbox" data-k="hoverPreview" ${cfg.hoverPreview!==false?"checked":""}></label>
-      <label>Żółta ramka widoku kamery<input type="checkbox" data-k="visibilityFrame" ${cfg.visibilityFrame?"checked":""}></label>
+      <label>Żółta ramka mgły wojny<input type="checkbox" data-k="visibilityFrame" ${cfg.visibilityFrame?"checked":""}></label>
       <label>Przyciemnij poza ramką<input type="checkbox" data-k="visibilityDim" ${cfg.visibilityDim?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div>
