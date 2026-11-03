@@ -359,6 +359,16 @@
         }
       }
     }
+    // Niektore przejscia sa NPC typu 6 (np. wejscie z ikona mas/exit.gif).
+    // Nie pojawiaja sie w gateways.getList(), dlatego zbieramy je osobno.
+    const npcGateways=[];
+    for(const o of all){
+      const d=o.d;
+      if(Number(d.type)!==6)continue;
+      const p=coord(o);if(!p)continue;
+      const name=String(d.nick||d.name||'Przejście').replace(/<[^>]*>/g,'').trim();
+      npcGateways.push({...p,name,id:d.id,raw:o,kind:'gateway',source:'npc'});
+    }
     const droppedItems=safeGroundItems(e).filter(o=>o?.d &&
       (o.canvasObjectType==="M_ITEM" || o.getCanvasObjectType?.()==="M_ITEM"))
       .map(o=>{
@@ -387,6 +397,13 @@
       const gatewayName=typeof rawName==='string'?rawName.replace(/<[^>]*>/g,'').trim():'';
       return {...p,name:gatewayName||'Przejście',id,raw:o,kind:'gateway'};
     }).filter(Boolean):[];
+    // Scal przejscia silnika z przejsciami typu NPC, bez duplikatow.
+    const gatePositions=new Set(gates.map(g=>`${g.x}:${g.y}`));
+    for(const gate of npcGateways){
+      const key=`${gate.x}:${gate.y}`;
+      if(gatePositions.has(key))continue;
+      gatePositions.add(key);gates.push(gate);
+    }
     return {players,npcs,objects,monsters,gates,items};
   }
   function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -723,12 +740,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.10',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.11',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.10'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.11'};
   if(cfg.visible)render();
 })();
