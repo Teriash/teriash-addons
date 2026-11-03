@@ -415,16 +415,48 @@
     if(src.includes("..")||src.includes("\\"))return "";
     return (window.CFG?.a_npath||window.CFG?.a_ipath||"")+src;
   }
-  function outfitUrl(value){
-    if(typeof value!=='string'||!value.trim())return '';
-    const v=value.trim();
-    if(/^(?:paid|kuf|eve|clan|premium|event|npc)\//i.test(v))return 'https://micc.garmory-cdn.cloud/obrazki/postacie/'+v;
-    if(/^\/(?:paid|kuf|eve|clan|premium|event|npc)\//i.test(v))return 'https://micc.garmory-cdn.cloud/obrazki/postacie/'+v.slice(1);
-    return imageUrl(v);
+  // Stroje postaci moga miec sciezki paid/, zwykle nazwy plikow,
+  // postacie/... lub pelne URL-e. Tlo CSS nie informuje o bledzie 404,
+  // dlatego sprawdzamy kolejne warianty przez Image.onload/onerror.
+  function outfitCandidates(value){
+    if(typeof value!=='string'||!value.trim())return [];
+    const raw=value.trim();
+    if(/^(?:javascript|data|blob):/i.test(raw)||raw.includes('\\'))return [];
+    if(/^https?:\/\//i.test(raw)||raw.startsWith('//'))return [raw];
+    const clean=raw.replace(/^\/+/, '').replace(/^obrazki\//i,'');
+    if(clean.includes('..'))return [];
+    const withoutPrefix=clean.replace(/^postacie\//i,'');
+    const base='https://micc.garmory-cdn.cloud/obrazki/postacie/';
+    const urls=[base+withoutPrefix];
+    const resolver=window.Engine?.interface?.getUrl;
+    if(typeof resolver==='function'){
+      try{const url=resolver.call(window.Engine.interface,raw);if(typeof url==='string'&&/^https?:\/\//i.test(url))urls.push(url)}catch{}
+    }
+    const fallback=imageUrl(raw);
+    if(fallback)urls.push(fallback);
+    return [...new Set(urls)];
+  }
+  function setPreviewOutfit(candidates){
+    const el=tip?.querySelector('.ta-outfit');
+    if(!el||!candidates.length)return;
+    const key=hoverKey;
+    let index=0;
+    function tryNext(){
+      if(index>=candidates.length)return;
+      const url=candidates[index++];
+      const img=new Image();
+      img.onload=()=>{
+        if(hoverKey!==key||!el.isConnected)return;
+        el.style.backgroundImage=`url("${url.replace(/["\\]/g,'')}")`;
+      };
+      img.onerror=tryNext;
+      img.src=url;
+    }
+    tryNext();
   }
   function previewInfo(hit){
     const p=hit.p,raw=p.raw,d=raw?.d||{},type=hit.type;
-    let name=p.name||d.nick||d.name||"Nieznany element",subtitle="",src="";
+    let name=p.name||d.nick||d.name||"Nieznany element",subtitle="",src="",outfits=[];
     if(type==="monster"){
       const labels={monsterNormal:'Potwór',monsterElite:'Elita',monsterElite2:'Elita II',monsterElite3:'Elita III',monsterColossus:'Kolos',monsterHero:'Heros',monsterTitan:'Tytan'};
       subtitle=[p.lvl?`Poziom: ${p.lvl}`:"",labels[p.monsterClass]||'Potwór'].filter(Boolean).join(" • ");
@@ -434,7 +466,8 @@
       src=imageUrl(d.icon||d.img||raw?.getIcon?.());
     }else if(type==="player"||type==="hero"){
       subtitle=[d.lvl?`Poziom: ${d.lvl}`:"",d.prof?`Profesja: ${d.prof}`:""].filter(Boolean).join(" • ")||"Gracz";
-      src=outfitUrl(d.outfit||d.icon||d.img||raw?.getIcon?.());
+      outfits=outfitCandidates(d.outfit||d.icon||d.img||raw?.getIcon?.());
+      src=outfits[0]||"";
     }else if(type==="item"){
       subtitle=p.source==="recovery"?"Przedmiot odradzający się":"Przedmiot wyrzucony";
       src=imageUrl(raw?.i?.icon||d.icon||raw?.icon||raw?.getIcon?.());
@@ -453,7 +486,8 @@
       const coords=`(${Number.isInteger(px)?px:px.toFixed(1)}, ${Number.isInteger(py)?py:py.toFixed(1)})`;
       subtitle=subtitle?`${subtitle} • ${coords}`:coords;
     }
-    return {name,subtitle,src};
+    return {name,subtitle,src,outfits,lootRange:(type==="player"||type==="hero")&&Number(d.lvl)>0
+      ? `${Math.round(Number(d.lvl)*.7)}–${Math.round(Number(d.lvl)*1.3)}` : ""};
   }
   // Menu kontekstowe gracza: natywny popup Margonem, jak w Klanowicze Online.
   function playerAtPointer(event){
@@ -519,10 +553,12 @@
       const img=info.src?((primary.type==='player'||primary.type==='hero')
         ?`<div class="ta-outfit" style="background-image:url('${escapeHtml(info.src)}')"></div>`
         :`<img alt="" src="${escapeHtml(info.src)}" onerror="this.style.display='none'">`):"";
+      const loot=info.lootRange?`<div class="ta-tip-sub">Loot: ${escapeHtml(info.lootRange)}</div>`:"";
       const nearbyPlayers=nearby.filter(h=>h.type==="player");
       const more=primary.type==="player" && nearbyPlayers.length>1?`<div class="ta-tip-list">W tym miejscu: ${nearbyPlayers.length} graczy<br>${nearbyPlayers.filter(h=>h!==primary).slice(0,4).map(h=>escapeHtml(h.p.name||h.type)).join(" · ")}</div>`:"";
-      tip.innerHTML=`<div class="ta-tip-title">${escapeHtml(info.name)}</div><div class="ta-tip-sub">${escapeHtml(info.subtitle)}</div>${img}${more}`;
+      tip.innerHTML=`<div class="ta-tip-title">${escapeHtml(info.name)}</div><div class="ta-tip-sub">${escapeHtml(info.subtitle)}</div>${loot}${img}${more}`;
       tip.style.display="block";tip.dataset.taCoordFormat="tuple";
+      if(info.outfits?.length)setPreviewOutfit(info.outfits);
     }
     movePreview(hoverPos.x,hoverPos.y);
   }
@@ -740,12 +776,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.11',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.12',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.11'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.12'};
   if(cfg.visible)render();
 })();
