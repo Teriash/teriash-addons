@@ -2,7 +2,7 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,visibilityFrame:false,visibilityDim:false,colors:{}};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,visibilityFrame:false,visibilityDim:false,rememberMonsters:false,colors:{}};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
@@ -53,6 +53,8 @@
   // pelny krok animacji. Ruch jest animowany w pikselach, nie skokowo po kratkach.
   let markerSnapshot=null,lastSampleAt=0,renderMapKey=null;
   const motion=new Map();
+  // Pamiec potworow tylko na aktualnej mapie i w biezacej sesji.
+  const rememberedMonsters=new Map();
   const SAMPLE_MS=35, MOVE_MS=165;
   function smoothPosition(p,kind,now){
     if(!p)return p;
@@ -595,6 +597,34 @@
     const x2=Math.min(w,hx+radius),y2=Math.min(h,hy+radius);
     return x2>x1&&y2>y1?{x1,y1,x2,y2}:null;
   }
+  function isInsideFog(p,bounds){
+    return !!bounds && p.x>=bounds.x1 && p.x<bounds.x2 && p.y>=bounds.y1 && p.y<bounds.y2;
+  }
+  function rememberedMonsterKey(p){
+    const id=p.id??p.raw?.d?.id;
+    return id==null?null:String(id);
+  }
+  function syncRememberedMonsters(monsters,bounds,now){
+    // Bez mgly nie utrzymujemy starych potworow: brak pewnej granicy weryfikacji.
+    if(!bounds){rememberedMonsters.clear();return []}
+    const live=new Set();
+    for(const p of monsters){
+      const id=rememberedMonsterKey(p);if(id==null)continue;
+      live.add(id);
+      // Kopia bez referencji do obiektu silnika (ktory moze zostac usuniety).
+      rememberedMonsters.set(id,{id,x:p.x,y:p.y,name:p.name,lvl:p.lvl,
+        monsterClass:p.monsterClass,kind:p.kind,lastSeen:now});
+    }
+    const ghosts=[];
+    for(const [id,p] of rememberedMonsters){
+      if(live.has(id))continue;
+      // Gdy wrocimy do zasiegu widzenia i potwora nie ma w danych silnika,
+      // usuwamy zapamietany znacznik. Margonem nie podaje przyczyny znikniecia.
+      if(isInsideFog(p,bounds)){rememberedMonsters.delete(id);continue}
+      ghosts.push({...p,remembered:true});
+    }
+    return ghosts;
+  }
   function drawWarFogDim(map,ox,oy,scale,w,h){
     if(!cfg.visibilityFrame||!cfg.visibilityDim)return;
     const bounds=getWarFogBounds(map,w,h);
@@ -620,7 +650,7 @@
     if(!canvas||!frame?.isConnected)return;
     syncRespMap();installRespHook();
     const key=currentMapKey();
-    if(key!==renderMapKey){renderMapKey=key;markerSnapshot=null;motion.clear();lastSampleAt=0}
+    if(key!==renderMapKey){renderMapKey=key;markerSnapshot=null;motion.clear();rememberedMonsters.clear();lastSampleAt=0}
     const d=data(),s=canvas.width,ms=mapSize(d);
     ctx.clearRect(0,0,s,s);ctx.fillStyle='#102027';ctx.fillRect(0,0,s,s);
     const w=ms.w,h=ms.h,valid=w>0&&h>0&&w<10000&&h<10000;
@@ -654,15 +684,17 @@
     // Na malych mapach kratki sa duze: ikony maja wyraznie rosnac,
     // ale nie zaslaniac calej kratki. Rozmiar zalezy od skali mapy.
     const markerRadius=(base)=>Math.max(base,Math.min(base*3.3,scale*.43));
-    const mark=(p,color,radius=3.6,type="object")=>{
+    const mark=(p,color,radius=3.6,type="object",dim=false)=>{
       radius=markerRadius(radius);
       if(!p)return;
       const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
       if(x<0||x>s||y<0||y>s)return;
       hoverHits.push({p,x,y,radius,type});
+      ctx.save();if(dim)ctx.globalAlpha=.30;
       ctx.fillStyle=color;ctx.strokeStyle='#081217';ctx.lineWidth=1.2;
       ctx.fillRect(x-radius,y-radius,2*radius,2*radius);ctx.strokeRect(x-radius,y-radius,2*radius,2*radius);
       if(cfg.labels&&p.name){ctx.font='10px Arial';ctx.fillStyle='#fff';ctx.fillText(p.name,x+radius+3,y-4)}
+      ctx.restore();
     };
     if(!markerSnapshot||now-lastSampleAt>=SAMPLE_MS){
       markerSnapshot=getMarkers(d.e);lastSampleAt=now;
@@ -670,6 +702,9 @@
       for(const [key,state] of motion)if(now-state.seen>2000)motion.delete(key);
     }
     const m=markerSnapshot;
+    const fogBounds=getWarFogBounds(d.e?.map,w,h);
+    const ghostMonsters=cfg.rememberMonsters?syncRememberedMonsters(m.monsters,fogBounds,now):[];
+    if(!cfg.rememberMonsters&&rememberedMonsters.size)rememberedMonsters.clear();
     const occupiedHeroRespawns=liveHeroesAtRespawns(d.e);
     if(cfg.respawns!==false){
       markNearbyRespawns(d.hero,occupiedHeroRespawns);
@@ -682,18 +717,26 @@
     if(cfg.gates!==false)for(const v of m.gates)mark(v,color('gateway'),3.6,'gateway');
     if(cfg.objects)for(const v of m.objects)mark(v,color('object'),2.5,'object');
     if(cfg.npcs)for(const v of m.npcs)mark(v,color('npc'),3,'npc');
+    if(cfg.monsters!==false)for(const v of ghostMonsters){
+      if(!['monsterHero','monsterColossus','monsterTitan'].includes(v.monsterClass))
+        mark(v,color(v.monsterClass||'monsterNormal'),3.2,'monster',true);
+    }
     if(cfg.monsters!==false)for(const v of m.monsters){
       if(!['monsterHero','monsterColossus','monsterTitan'].includes(v.monsterClass))
-        mark(v,color(v.monsterClass||'monsterNormal'),3.2,"monster");
+        mark(v,color(v.monsterClass||'monsterNormal'),3.2,"monster",cfg.rememberMonsters&&!!fogBounds&&!isInsideFog(v,fogBounds));
     }
     if(cfg.items!==false)for(const v of m.items){
       const key=v.source==='recovery'?'itemRecovery':v.rarity==='legendary'?'itemLegendary':v.rarity==='heroic'?'itemHeroic':v.rarity==='unique'?'itemUnique':'itemNormal';
       mark(v,color(key),3,"item");
     }
+    if(cfg.monsters!==false)for(const v of ghostMonsters){
+      if(['monsterHero','monsterColossus','monsterTitan'].includes(v.monsterClass))
+        mark(v,color(v.monsterClass),3.2,'monster',true);
+    }
     // Rangi heros/kolos/tytan sa rysowane nad innymi obiektami.
     if(cfg.monsters!==false)for(const v of m.monsters){
       if(['monsterHero','monsterColossus','monsterTitan'].includes(v.monsterClass))
-        mark(v,color(v.monsterClass),3.2,'monster');
+        mark(v,color(v.monsterClass),3.2,'monster',cfg.rememberMonsters&&!!fogBounds&&!isInsideFog(v,fogBounds));
     }
     // Specjalne ikony sa niezalezne od widocznosci zwyklych kwadratow NPC.
     drawNpcIcons(m.npcs,ox,oy,scale,s);
@@ -799,6 +842,7 @@
       <label>Podgląd elementów po najechaniu<input type="checkbox" data-k="hoverPreview" ${cfg.hoverPreview!==false?"checked":""}></label>
       <label>Żółta ramka mgły wojny<input type="checkbox" data-k="visibilityFrame" ${cfg.visibilityFrame?"checked":""}></label>
       <label>Przyciemnij poza ramką<input type="checkbox" data-k="visibilityDim" ${cfg.visibilityDim?"checked":""}></label>
+      <label>Zapamiętuj potwory poza mgłą (przygaszone)<input type="checkbox" data-k="rememberMonsters" ${cfg.rememberMonsters?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div>
       <button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
@@ -809,7 +853,7 @@
     };
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
-      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview","npcIcons","visibilityFrame","visibilityDim"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview","npcIcons","visibilityFrame","visibilityDim","rememberMonsters"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(1100,Number(menu.querySelector('[data-k="size"]').value)||500));
        cfg.zoom=1;
       menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
