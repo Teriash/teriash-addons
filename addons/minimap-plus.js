@@ -643,6 +643,16 @@
         for(let y=0;y<=h;y+=step){let py=oy+y*scale;ctx.moveTo(ox,py);ctx.lineTo(ox+w*scale,py)}ctx.stroke()}
     }
     drawWarFogDim(d.e?.map,ox,oy,scale,w,h);
+    // Na mapach z mgla wojny znaczniki musza miescic sie wewnatrz
+    // rzeczywistego obszaru visibility. Teren pozostaje bez zmian.
+    const fogBounds=cfg.visibilityFrame?getWarFogBounds(d.e?.map,w,h):null;
+    if(fogBounds){
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(ox+fogBounds.x1*scale,oy+fogBounds.y1*scale,
+        (fogBounds.x2-fogBounds.x1)*scale,(fogBounds.y2-fogBounds.y1)*scale);
+      ctx.clip();
+    }
     hoverHits=[];
     // Wielkosc znacznika rosnie wraz z wielkoscia pojedynczej kratki,
     // ale pozostaje czytelna i nie zajmuje calej kratki na malych mapach.
@@ -651,7 +661,10 @@
     const markerRadius=(base)=>Math.max(base,Math.min(base*3.3,scale*.43));
     const mark=(p,color,radius=3.6,type="object")=>{
       radius=markerRadius(radius);
-      if(!p)return;const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
+      if(!p)return;
+      if(fogBounds && (p.x+.5<fogBounds.x1||p.x+.5>fogBounds.x2||
+         p.y+.5<fogBounds.y1||p.y+.5>fogBounds.y2))return;
+      const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
       if(x<0||x>s||y<0||y>s)return;
       hoverHits.push({p,x,y,radius,type});
       ctx.fillStyle=color;ctx.strokeStyle='#081217';ctx.lineWidth=1.2;
@@ -711,6 +724,13 @@
       }
     }
 
+    if(fogBounds){
+      ctx.restore(); // Koniec ograniczenia rysowania znacznikow.
+      // Wyklucz rowniez interakcje z elementami poza granica mgly.
+      hoverHits=hoverHits.filter(hit=>hit.p &&
+        hit.p.x+.5>=fogBounds.x1 && hit.p.x+.5<=fogBounds.x2 &&
+        hit.p.y+.5>=fogBounds.y1 && hit.p.y+.5<=fogBounds.y2);
+    }
     drawWarFogBorder(d.e?.map,ox,oy,scale,w,h);
     note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length} • respy: ${respPoints.length}`:'Brak wymiarów mapy';
     updatePreview();
