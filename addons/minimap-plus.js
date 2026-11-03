@@ -604,23 +604,47 @@
     const id=p.id??p.raw?.d?.id??p.raw?.id;
     return id==null?null:String(id);
   }
-  function syncRememberedMonsters(monsters,bounds,now){
-    // Bez mgly nie utrzymujemy starych potworow: brak pewnej granicy weryfikacji.
+  function syncRememberedMonsters(monsters,bounds,now,e){
+    // Pobieramy rowniez NPC z listy silnika. getDrawableList() nie jest
+    // gwarantowana kompletna lista w kazdej klatce.
     if(!bounds){rememberedMonsters.clear();return []}
-    const live=new Set();
-    for(const p of monsters){
-      const id=rememberedMonsterKey(p);if(id==null)continue;
-      live.add(id);
-      // Kopia bez referencji do obiektu silnika (ktory moze zostac usuniety).
+    const candidates=new Map();
+    const add=(p)=>{
+      if(!p||!Number.isFinite(Number(p.x))||!Number.isFinite(Number(p.y)))return;
+      const id=rememberedMonsterKey(p);if(id==null)return;
+      if(!isInsideFog(p,bounds))return; // zapamietujemy tylko zaobserwowane
+      candidates.set(id,p);
+    };
+    for(const p of monsters)add(p);
+    let all=[];
+    try{
+      const checked=e?.npcs?.check?.();
+      all=Array.isArray(checked)?checked:checked&&typeof checked==='object'?Object.values(checked):[];
+    }catch{}
+    for(const o of all){
+      if(!o?.d)continue;
+      const p=coord(o);if(!p)continue;
+      let kind='';try{kind=String(o.getKind?.()||'').toLowerCase()}catch{}
+      if(!isMonster(o,kind))continue;
+      p.id=o.d.id??o.id;p.raw=o;p.kind=kind;
+      p.name=p.name||String(o.d.nick||'');
+      p.lvl=Number(o.d.lvl)||0;p.monsterClass=monsterClass(o,kind);
+      add(p);
+    }
+    for(const [id,p] of candidates){
       rememberedMonsters.set(id,{id,x:p.x,y:p.y,name:p.name,lvl:p.lvl,
         monsterClass:p.monsterClass,kind:p.kind,lastSeen:now});
     }
     const ghosts=[];
     for(const [id,p] of rememberedMonsters){
-      if(live.has(id))continue;
-      // Gdy wrocimy do zasiegu widzenia i potwora nie ma w danych silnika,
-      // usuwamy zapamietany znacznik. Margonem nie podaje przyczyny znikniecia.
-      if(isInsideFog(p,bounds)){rememberedMonsters.delete(id);continue}
+      if(candidates.has(id))continue;
+      // Gdy obszar ponownie znajduje sie w zasiegu, brak NPC oznacza
+      // usuniecie znacznika. Poza zasiegiem pozostaje ostatnia pozycja.
+      if(isInsideFog(p,bounds)){
+        // Ochrona przed chwilowymi brakami danych podczas aktualizacji.
+        if(now-p.lastSeen>500)rememberedMonsters.delete(id);
+        continue;
+      }
       ghosts.push({...p,remembered:true});
     }
     return ghosts;
@@ -703,7 +727,7 @@
     }
     const m=markerSnapshot;
     const fogBounds=getWarFogBounds(d.e?.map,w,h);
-    const ghostMonsters=cfg.rememberMonsters?syncRememberedMonsters(m.monsters,fogBounds,now):[];
+    const ghostMonsters=cfg.rememberMonsters?syncRememberedMonsters(m.monsters,fogBounds,now,d.e):[];
     if(!cfg.rememberMonsters&&rememberedMonsters.size)rememberedMonsters.clear();
     const occupiedHeroRespawns=liveHeroesAtRespawns(d.e);
     if(cfg.respawns!==false){
