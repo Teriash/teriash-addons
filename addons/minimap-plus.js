@@ -160,7 +160,7 @@
   #ta-mm *{box-sizing:border-box}#ta-mm .head{height:33px;display:flex;align-items:center;justify-content:space-between;
     background:#11262c;cursor:move;padding:0 7px 0 11px;font-weight:700}
   #ta-mm button{background:#19343b;border:1px solid #386f78;border-radius:5px;color:#def;padding:3px 7px;cursor:pointer}
-  #ta-mm canvas{display:block;width:100%;aspect-ratio:1;background:#132126;cursor:crosshair}
+  #ta-mm canvas{display:block;width:100%;aspect-ratio:1;background:#132126;cursor:inherit}
   #ta-mm .footer{font-size:11px;color:#a8c1c9;padding:6px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #ta-mm-preview{position:fixed;z-index:8502;pointer-events:none;display:none;min-width:155px;max-width:240px;
     padding:9px 11px;background:linear-gradient(#222b2e,#090d10);border:1px solid #526067;
