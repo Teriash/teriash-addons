@@ -341,7 +341,7 @@
     const all=safeDrawable(e?.npcs).filter(o=>o?.d&&Number.isFinite(Number(o.d.x))&&Number.isFinite(Number(o.d.y)));
     const npcs=[],objects=[],monsters=[],recovery=[];
     for(const o of all){
-      const d=o.d,p=coord(o);if(!p)continue;p.raw=o;
+      const d=o.d,p=coord(o);if(!p)continue;p.raw=o;p.id=d.id??o.id;
       let kind="";
       try{kind=String(o.getKind?.()||"").toLowerCase()}catch{}
       // Nie filtruj po lvl: niektore prawdziwe potwory (np. Krabik) maja lvl=0.
@@ -601,7 +601,7 @@
     return !!bounds && p.x>=bounds.x1 && p.x<bounds.x2 && p.y>=bounds.y1 && p.y<bounds.y2;
   }
   function rememberedMonsterKey(p){
-    const id=p.id??p.raw?.d?.id;
+    const id=p.id??p.raw?.d?.id??p.raw?.id;
     return id==null?null:String(id);
   }
   function syncRememberedMonsters(monsters,bounds,now){
@@ -882,12 +882,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.19',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.21',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.19'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.21'};
   if(cfg.visible)render();
 })();
