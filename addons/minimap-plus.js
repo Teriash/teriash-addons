@@ -857,7 +857,7 @@
     if(frame)return;
     frame=document.createElement("div");frame.id="ta-mm";
     frame.innerHTML='<div class="head"><span>MINIMAPA+</span><span><button data-act="settings" title="Ustawienia">⚙</button> <button data-act="hide" title="Ukryj">×</button></span></div><canvas></canvas><div class="footer">Ładowanie…</div>';
-    document.body.appendChild(frame);canvas=frame.querySelector("canvas");ctx=canvas.getContext("2d");syncNativeCursor();
+    document.body.appendChild(frame);canvas=frame.querySelector("canvas");ctx=canvas.getContext("2d");lastNativeCursor="";syncNativeCursor();
     tip=document.createElement("div");tip.id="ta-mm-preview";document.body.appendChild(tip);
     canvas.addEventListener("pointermove",e=>{hoverPos={x:e.clientX,y:e.clientY};updatePreview()});
     canvas.addEventListener("pointerleave",()=>{hoverPos=null;hidePreview()});
@@ -951,12 +951,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.21',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.22',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.21'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.22'};
   if(cfg.visible)render();
 })();
