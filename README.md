@@ -231,4 +231,9 @@ Włącz w panelu TA. Przesuwaj za pasek tytułu; ustaw rozmiar w ⚙. Przycisk �
 ### v1.6.2 — Minimapa+ 0.2.1
 Klawisz Q otwiera/zamyka Minimapa+. Nie przechwytuje Q podczas pisania w polach tekstowych. Nowe instalacje startują z ukrytym oknem.
 
-- v1.6.36: Minimapa+ - dodatkowe warianty adresow strojow graczy (z automatycznym fallbackiem) i wyswietlanie orientacyjnego przedzialu lootu 70–130% poziomu gracza.
+- v1.6.37: Minimapa+ - dodatkowe warianty adresow strojow graczy (z automatycznym fallbackiem) i wyswietlanie orientacyjnego przedzialu lootu 70–130% poziomu gracza.
+
+
+## v1.6.37
+- Minimapa+: zakres Loot z oryginalnego Engine.groupingRange.getGroupingRange(level), zamiast 70-130%.
+- Maksymalny poziom postaci 500; gorna granica przedzialu lootu nie jest obcinana.

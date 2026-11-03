@@ -454,6 +454,23 @@
     }
     tryNext();
   }
+  // Zakres lootu pobieramy z oryginalnej funkcji Margonem.
+  // Nie ograniczamy koncowej wartosci zakresu do 500: na swiatach prywatnych
+  // oryginalny tooltip moze pokazywac np. 212 - 530.
+  function originalLootRange(level){
+    const lvl=Number(level);
+    if(!Number.isFinite(lvl)||lvl<1)return "";
+    try{
+      const getRange=window.Engine?.groupingRange?.getGroupingRange;
+      if(typeof getRange!=="function")return "";
+      const html=getRange.call(window.Engine.groupingRange,Math.min(500,Math.max(1,Math.trunc(lvl))));
+      if(typeof html!=="string"||!html)return "";
+      const holder=document.createElement("div");
+      holder.innerHTML=html;
+      const value=holder.querySelector(".info_tooltip_loot .value");
+      return value?.textContent?.trim()||"";
+    }catch(e){return "";}
+  }
   function previewInfo(hit){
     const p=hit.p,raw=p.raw,d=raw?.d||{},type=hit.type;
     let name=p.name||d.nick||d.name||"Nieznany element",subtitle="",src="",outfits=[];
@@ -486,8 +503,7 @@
       const coords=`(${Number.isInteger(px)?px:px.toFixed(1)}, ${Number.isInteger(py)?py:py.toFixed(1)})`;
       subtitle=subtitle?`${subtitle} • ${coords}`:coords;
     }
-    return {name,subtitle,src,outfits,lootRange:(type==="player"||type==="hero")&&Number(d.lvl)>0
-      ? `${Math.round(Number(d.lvl)*.7)}–${Math.round(Number(d.lvl)*1.3)}` : ""};
+    return {name,subtitle,src,outfits,lootRange:(type==="player"||type==="hero") ? originalLootRange(d.lvl??p.lvl) : ""};
   }
   // Menu kontekstowe gracza: natywny popup Margonem, jak w Klanowicze Online.
   function playerAtPointer(event){
