@@ -160,7 +160,7 @@
   #ta-mm *{box-sizing:border-box}#ta-mm .head{height:33px;display:flex;align-items:center;justify-content:space-between;
     background:#11262c;cursor:move;padding:0 7px 0 11px;font-weight:700}
   #ta-mm button{background:#19343b;border:1px solid #386f78;border-radius:5px;color:#def;padding:3px 7px;cursor:pointer}
-  #ta-mm canvas{display:block;width:100%;aspect-ratio:1;background:#132126;cursor:inherit}
+  #ta-mm canvas{display:block;width:100%;aspect-ratio:1;background:#132126;cursor:var(--ta-mm-game-cursor, auto)}
   #ta-mm .footer{font-size:11px;color:#a8c1c9;padding:6px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #ta-mm-preview{position:fixed;z-index:8502;pointer-events:none;display:none;min-width:155px;max-width:240px;
     padding:9px 11px;background:linear-gradient(#222b2e,#090d10);border:1px solid #526067;
@@ -179,6 +179,51 @@
   #ta-mm-settings button{background:#20464d;color:white;border:1px solid #327582;border-radius:5px;padding:7px;cursor:pointer}
   `;
   document.head.appendChild(css);
+  // Native Margonem cursor is often assigned directly to the game viewport,
+  // not to body. Inheriting from our floating panel therefore does not work.
+  // Read the actual computed CSS cursor of the game surface and apply it to
+  // the custom minimap. Do not copy cursors from our own panel/UI.
+  let lastNativeCursor="";
+  function syncNativeCursor(){
+    if(!canvas||!frame?.isConnected)return;
+    let found="";
+    const candidates=[];
+    // First inspect the real game surface underneath our floating minimap.
+    const rect=canvas.getBoundingClientRect();
+    if(rect.width&&rect.height){
+      const x=rect.left+rect.width/2,y=rect.top+rect.height/2;
+      const previous=frame.style.pointerEvents;
+      frame.style.pointerEvents="none";
+      try{const below=document.elementFromPoint(x,y);if(below)candidates.push(below)}
+      finally{frame.style.pointerEvents=previous}
+    }
+    // The map can be outside the minimap window, e.g. if the panel floats
+    // above the sidebar. Inspect game canvases and known viewport elements.
+    for(const selector of ["#ground", "#game", "#map", ".game-map", ".map-canvas", "canvas"]){
+      for(const el of document.querySelectorAll(selector)){
+        if(!frame.contains(el))candidates.push(el);
+      }
+    }
+    for(const element of candidates){
+      let el=element;
+      while(el&&el!==document.documentElement){
+        if(el!==frame&&!frame.contains(el)){
+          const value=getComputedStyle(el).cursor;
+          if(value&&/url\s*\(/i.test(value)){found=value;break}
+        }
+        el=el.parentElement;
+      }
+      if(found)break;
+    }
+    // Preserve the game's actual image cursor. If the game uses only a
+    // standard cursor, use the default arrow rather than the old crosshair.
+    const next=found||"auto";
+    if(next!==lastNativeCursor){
+      canvas.style.setProperty("--ta-mm-game-cursor",next);
+      lastNativeCursor=next;
+    }
+  }
+  const nativeCursorTimer=setInterval(syncNativeCursor,1200);
   function save(){B.setValue(KEY,cfg)}
   function data(){
     const e=engine(),m=e?.map;
@@ -812,7 +857,7 @@
     if(frame)return;
     frame=document.createElement("div");frame.id="ta-mm";
     frame.innerHTML='<div class="head"><span>MINIMAPA+</span><span><button data-act="settings" title="Ustawienia">⚙</button> <button data-act="hide" title="Ukryj">×</button></span></div><canvas></canvas><div class="footer">Ładowanie…</div>';
-    document.body.appendChild(frame);canvas=frame.querySelector("canvas");ctx=canvas.getContext("2d");
+    document.body.appendChild(frame);canvas=frame.querySelector("canvas");ctx=canvas.getContext("2d");syncNativeCursor();
     tip=document.createElement("div");tip.id="ta-mm-preview";document.body.appendChild(tip);
     canvas.addEventListener("pointermove",e=>{hoverPos={x:e.clientX,y:e.clientY};updatePreview()});
     canvas.addEventListener("pointerleave",()=>{hoverPos=null;hidePreview()});
