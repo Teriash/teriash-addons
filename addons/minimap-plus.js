@@ -714,7 +714,7 @@
       const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
       if(x<0||x>s||y<0||y>s)return;
       hoverHits.push({p,x,y,radius,type});
-      ctx.save();if(dim)ctx.globalAlpha=.30;
+      ctx.save();if(dim)ctx.globalAlpha=.40;
       ctx.fillStyle=color;ctx.strokeStyle='#081217';ctx.lineWidth=1.2;
       ctx.fillRect(x-radius,y-radius,2*radius,2*radius);ctx.strokeRect(x-radius,y-radius,2*radius,2*radius);
       if(cfg.labels&&p.name){ctx.font='10px Arial';ctx.fillStyle='#fff';ctx.fillText(p.name,x+radius+3,y-4)}
