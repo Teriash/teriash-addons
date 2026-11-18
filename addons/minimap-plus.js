@@ -715,11 +715,44 @@
     ctx.strokeRect(ox+x1*scale,oy+y1*scale,(x2-x1)*scale,(y2-y1)*scale);
     ctx.restore();
   }
-  function paint(now=performance.now()){
-    if(!canvas||!frame?.isConnected)return;
+  // Zbieranie stanu jest niezalezne od widocznosci okna Minimapa+.
+  // Gdy okno jest zamkniete, nadal rejestrujemy odwiedzone respy,
+  // obserwowane potwory i usuwamy nieaktualne zapamietane znaczniki.
+  function sampleWorld(now=performance.now()){
     syncRespMap();installRespHook();
     const key=currentMapKey();
-    if(key!==renderMapKey){renderMapKey=key;markerSnapshot=null;motion.clear();rememberedMonsters.clear();lastSampleAt=0}
+    if(key!==renderMapKey){
+      renderMapKey=key;markerSnapshot=null;motion.clear();
+      rememberedMonsters.clear();lastSampleAt=0;
+    }
+    const d=data();
+    if(!d.e?.map||!key)return;
+    if(!markerSnapshot||now-lastSampleAt>=SAMPLE_MS){
+      markerSnapshot=getMarkers(d.e);lastSampleAt=now;
+      for(const [id,state] of motion)if(now-state.seen>2000)motion.delete(id);
+    }
+    const ms=mapSize(d);
+    const fogBounds=getWarFogBounds(d.e.map,ms.w,ms.h);
+    if(cfg.rememberMonsters){
+      // Nie usuwamy pamieci po zamknieciu okna: aktualizujemy ja w tle.
+      syncRememberedMonsters(markerSnapshot.monsters,fogBounds,now,d.e);
+    }else if(rememberedMonsters.size){
+      rememberedMonsters.clear();
+    }
+    if(cfg.respawns!==false){
+      markNearbyRespawns(d.hero,liveHeroesAtRespawns(d.e));
+    }
+  }
+  // Niezalezny od requestAnimationFrame odczyt dziala takze po closeView().
+  // Probkowanie co 150 ms jest wystarczajaco czeste dla ruchu po mapie.
+  const worldSyncTimer=setInterval(()=>{
+    try{sampleWorld()}catch(error){console.warn('[Minimapa+] Synchronizacja w tle:',error)}
+  },150);
+  sampleWorld();
+
+  function paint(now=performance.now()){
+    if(!canvas||!frame?.isConnected)return;
+    sampleWorld(now);
     const d=data(),s=canvas.width,ms=mapSize(d);
     ctx.clearRect(0,0,s,s);ctx.fillStyle='#102027';ctx.fillRect(0,0,s,s);
     const w=ms.w,h=ms.h,valid=w>0&&h>0&&w<10000&&h<10000;
@@ -772,11 +805,13 @@
     }
     const m=markerSnapshot;
     const fogBounds=getWarFogBounds(d.e?.map,w,h);
-    const ghostMonsters=cfg.rememberMonsters?syncRememberedMonsters(m.monsters,fogBounds,now,d.e):[];
-    if(!cfg.rememberMonsters&&rememberedMonsters.size)rememberedMonsters.clear();
+    // Pamiec byla juz zaktualizowana przez sampleWorld; tutaj tylko rysujemy duchy.
+    const liveMonsterIds=new Set(m.monsters.map(rememberedMonsterKey).filter(id=>id!=null));
+    const ghostMonsters=cfg.rememberMonsters?[...rememberedMonsters.values()]
+      .filter(p=>!liveMonsterIds.has(p.id)&&!isInsideFog(p,fogBounds))
+      .map(p=>({...p,remembered:true})):[];
     const occupiedHeroRespawns=liveHeroesAtRespawns(d.e);
     if(cfg.respawns!==false){
-      markNearbyRespawns(d.hero,occupiedHeroRespawns);
       for(const p of respPoints){
         if(respHasHero(p,occupiedHeroRespawns))continue;
         const marker={...p,name:p.nick,kind:'respawn'};
@@ -942,7 +977,7 @@
     toggle();
   }
   document.addEventListener("keydown",onKeyDown,true);
-  function destroy(){clearInterval(respSyncTimer);if(respHookTarget&&respHookOriginal&&respHookTarget.updateWindowMiniMapRespPos===respHookOriginal.wrapped)respHookTarget.updateWindowMiniMapRespPos=respHookOriginal.fn;document.removeEventListener("keydown",onKeyDown,true);closeView();css.remove();delete window.TeriashMinimapPlus}
+  function destroy(){clearInterval(worldSyncTimer);clearInterval(respSyncTimer);if(respHookTarget&&respHookOriginal&&respHookTarget.updateWindowMiniMapRespPos===respHookOriginal.wrapped)respHookTarget.updateWindowMiniMapRespPos=respHookOriginal.fn;document.removeEventListener("keydown",onKeyDown,true);closeView();css.remove();delete window.TeriashMinimapPlus}
   function diagnostics(){
     const e=engine();const raw=safeDrawable(e?.npcs);
     const groups={};for(const o of raw){
@@ -951,12 +986,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.22',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.23',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.22'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.23'};
   if(cfg.visible)render();
 })();
