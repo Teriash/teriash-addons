@@ -556,12 +556,22 @@
     }
     return [...new Set(notes)];
   }
+  // Jedno wykrywanie grupy dla wszystkich rang NPC.
+  // groupType oraz oryginalny tooltip nie zaleza od getKind()/wt.
   function monsterGroupInfo(p){
-    const d=p.raw?.d||{};
-    const text=nativeDescription(p,'monster');
-    if(/\bw\s+grupie\b/i.test(text))return 'W grupie';
+    if(p?.inGroup===true)return 'W grupie';
+    const raw=p?.raw;
+    const d=raw?.d||{};
     if(d.group===true||d.isGroup===true||d.inGroup===true)return 'W grupie';
-    // Brak informacji nie oznacza, ze potwor nie jest w grupie.
+    if(Number(d.groupType)>0)return 'W grupie';
+    // Uzyj tego samego API co oryginalna minimapa; nie wymagaj konkretnej rangi.
+    if(raw && typeof raw.getKind==='function'){
+      try{
+        const tip=window.Engine?.npcs?.getTip?.(raw,{withIcon:false});
+        if(typeof tip==='string' && /w\s+grupie/i.test(tip))return 'W grupie';
+      }catch{}
+    }
+    if(/w\s+grupie/i.test(nativeDescription(p,'monster')))return 'W grupie';
     return '';
   }
   function previewInfo(hit){
@@ -724,7 +734,7 @@
     }
     for(const [id,p] of candidates){
       rememberedMonsters.set(id,{id,x:p.x,y:p.y,name:p.name,lvl:p.lvl,
-        monsterClass:p.monsterClass,kind:p.kind,lastSeen:now});
+        monsterClass:p.monsterClass,kind:p.kind,inGroup:monsterGroupInfo(p)==='W grupie',lastSeen:now});
     }
     const ghosts=[];
     for(const [id,p] of rememberedMonsters){
@@ -1032,12 +1042,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.23',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.24',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.23'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.24'};
   if(cfg.visible)render();
 })();
