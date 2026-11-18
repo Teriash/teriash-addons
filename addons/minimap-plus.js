@@ -2,7 +2,7 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,visibilityFrame:false,visibilityDim:false,rememberMonsters:false,colors:{}};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,visibilityFrame:false,visibilityDim:false,rememberMonsters:false,highlightMonsterGroup:true,colors:{}};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
@@ -48,7 +48,7 @@
   }
 
   const engine=()=>window.Engine;
-  let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="";
+  let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="",hoveredMonsterId=null;
   // Render do 60 FPS. Probkowanie obiektow czesciej, bez czekania na
   // pelny krok animacji. Ruch jest animowany w pikselach, nie skokowo po kratkach.
   let markerSnapshot=null,lastSampleAt=0,renderMapKey=null;
@@ -574,6 +574,37 @@
     if(/w\s+grupie/i.test(nativeDescription(p,'monster')))return 'W grupie';
     return '';
   }
+  // groupType is a group *type*, not a unique group identifier.
+  // Only explicit instance identifiers are safe to use as exact membership.
+  function monsterGroupId(p){
+    const d=p?.raw?.d||p||{};
+    for(const key of ['groupId','groupID','group_id','grpId','groupUid','groupInstanceId']){
+      const value=d[key];
+      if(value!==undefined&&value!==null&&value!==''&&value!==false)return String(value);
+    }
+    return null;
+  }
+  function monsterGroupMembers(selected,markers){
+    if(!selected||monsterGroupInfo(selected)!=='W grupie')return [];
+    const selectedId=monsterGroupId(selected);
+    if(selectedId!=null){
+      return markers.filter(p=>monsterGroupInfo(p)==='W grupie'&&monsterGroupId(p)===selectedId);
+    }
+    // The client does not expose a confirmed group-instance ID for every NPC.
+    // Fallback: only nearby connected monsters marked by the game as grouped.
+    // This is an approximation, not proof that all are in the same battle group.
+    const members=[selected],visited=new Set([rememberedMonsterKey(selected)]);
+    for(let i=0;i<members.length;i++){
+      const a=members[i];
+      for(const b of markers){
+        const id=rememberedMonsterKey(b);
+        if(id==null||visited.has(id)||monsterGroupInfo(b)!=='W grupie')continue;
+        if(Math.hypot(Number(a.x)-Number(b.x),Number(a.y)-Number(b.y))>2.3)continue;
+        visited.add(id);members.push(b);
+      }
+    }
+    return members;
+  }
   function previewInfo(hit){
     const p=hit.p,raw=p.raw,d=raw?.d||{},type=hit.type;
     let name=p.name||d.nick||d.name||"Nieznany element",subtitle="",src="",outfits=[];
@@ -734,7 +765,7 @@
     }
     for(const [id,p] of candidates){
       rememberedMonsters.set(id,{id,x:p.x,y:p.y,name:p.name,lvl:p.lvl,
-        monsterClass:p.monsterClass,kind:p.kind,inGroup:monsterGroupInfo(p)==='W grupie',lastSeen:now});
+        monsterClass:p.monsterClass,kind:p.kind,inGroup:monsterGroupInfo(p)==='W grupie',groupId:monsterGroupId(p),lastSeen:now});
     }
     const ghosts=[];
     for(const [id,p] of rememberedMonsters){
@@ -920,6 +951,25 @@
       }
     }
 
+    // Hover group outline is drawn above all markers; no permanent recoloring.
+    if(cfg.highlightMonsterGroup!==false&&hoverPos&&cfg.monsters!==false){
+      const rect=canvas.getBoundingClientRect();
+      const px=(hoverPos.x-rect.left)*canvas.width/rect.width;
+      const py=(hoverPos.y-rect.top)*canvas.height/rect.height;
+      const hits=hoverHits.filter(hit=>hit.type==='monster'&&Math.hypot(hit.x-px,hit.y-py)<=Math.max(6,hit.radius+3));
+      const selected=hits[hits.length-1]?.p;
+      if(selected&&monsterGroupInfo(selected)==='W grupie'){
+        const members=monsterGroupMembers(selected,[...ghostMonsters,...m.monsters]);
+        const ids=new Set(members.map(rememberedMonsterKey));
+        for(const hit of hoverHits){
+          if(hit.type!=='monster'||!ids.has(rememberedMonsterKey(hit.p)))continue;
+          const r=hit.radius+2;
+          ctx.save();ctx.strokeStyle='#ff67c8';ctx.lineWidth=2.4;
+          ctx.shadowColor='#ff56c4';ctx.shadowBlur=5;
+          ctx.strokeRect(hit.x-r,hit.y-r,r*2,r*2);ctx.restore();
+        }
+      }
+    }
     drawWarFogBorder(d.e?.map,ox,oy,scale,w,h);
     note=valid?`Mapa ${w}×${h} • NPC: ${m.npcs.length} • potwory: ${m.monsters.length} • przedmioty: ${m.items.length} • gracze: ${m.players.length} • przejścia: ${m.gates.length} • respy: ${respPoints.length}`:'Brak wymiarów mapy';
     updatePreview();
@@ -1003,6 +1053,7 @@
       <label>Żółta ramka mgły wojny<input type="checkbox" data-k="visibilityFrame" ${cfg.visibilityFrame?"checked":""}></label>
       <label>Przyciemnij poza ramką<input type="checkbox" data-k="visibilityDim" ${cfg.visibilityDim?"checked":""}></label>
       <label>Zapamiętuj potwory poza mgłą (przygaszone)<input type="checkbox" data-k="rememberMonsters" ${cfg.rememberMonsters?"checked":""}></label>
+      <label>Podświetl grupę potworów po najechaniu (różowa ramka)<input type="checkbox" data-k="highlightMonsterGroup" ${cfg.highlightMonsterGroup!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div>
       <button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
@@ -1013,7 +1064,7 @@
     };
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
-      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview","npcIcons","visibilityFrame","visibilityDim","rememberMonsters"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview","npcIcons","visibilityFrame","visibilityDim","rememberMonsters","highlightMonsterGroup"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
       cfg.size=Math.max(160,Math.min(1100,Number(menu.querySelector('[data-k="size"]').value)||500));
        cfg.zoom=1;
       menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
