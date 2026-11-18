@@ -518,12 +518,58 @@
       return value?.textContent?.trim()||"";
     }catch(e){return "";}
   }
+  // Pobierz opis z danych silnika, bez zgadywania ograniczen przejscia.
+  function nativeDescription(p,type){
+    const raw=p?.raw, d=raw?.d||{};
+    const values=[p?.description,d?.tip,d?.tooltip,d?.desc,d?.description,d?.info,
+      raw?.tip,raw?.tooltip,raw?.description];
+    // NPC: silnik generuje opis zawierajacy np. "w grupie".
+    if(type==='monster'){
+      try{const value=window.Engine?.npcs?.getTip?.(raw);if(value)values.push(value)}catch{}
+    }
+    if(typeof raw?.getTip==='function'){
+      try{const value=raw.getTip();if(value)values.push(value)}catch{}
+    }
+    const strings=[];
+    for(const value of values){
+      if(typeof value==='string')strings.push(value);
+      else if(Array.isArray(value))for(const part of value)if(typeof part==='string')strings.push(part);
+    }
+    const box=document.createElement('div');
+    return strings.map(value=>{
+      box.innerHTML=value.replace(/<br\s*\/?>/gi,'\n');
+      return (box.textContent||'').replace(/\s+/g,' ').trim();
+    }).filter(Boolean).join(' | ');
+  }
+  function gatewayRestrictions(p){
+    const d=p.raw?.d||{};
+    const text=nativeDescription(p,'gateway');
+    const notes=[];
+    // Wyswietlaj tylko warunki obecne w opisie, nie wyciagaj ich z poziomu mapy.
+    const level=text.match(/(?:od\s+\d+\s+do\s+\d+\s+poziomu|(?:od|do|powyżej|poniżej|min(?:imum)?|max(?:imum)?)\s*\d+\s*(?:poziomu|lvl|lv)?|\d+\s*[-–]\s*\d+\s*(?:lvl|poziom))/i);
+    if(level)notes.push('Ograniczenie poziomu: '+level[0]);
+    const key=text.match(/(?:wymaga(?:ny|ne|nego)?\s+(?:posiadania\s+)?(?:klucza|klucz)|potrzebny\s+klucz|klucz\s+do\s+wejścia)[^|,.]{0,90}/i);
+    if(key)notes.push('Wymagany klucz: '+key[0]);
+    if(d.minLvl!=null||d.maxLvl!=null){
+      const min=d.minLvl??d.minLevel, max=d.maxLvl??d.maxLevel;
+      if(min!=null||max!=null)notes.push('Poziom wejścia: '+[min!=null?'od '+min:'',max!=null?'do '+max:''].filter(Boolean).join(' '));
+    }
+    return [...new Set(notes)];
+  }
+  function monsterGroupInfo(p){
+    const d=p.raw?.d||{};
+    const text=nativeDescription(p,'monster');
+    if(/\bw\s+grupie\b/i.test(text))return 'W grupie';
+    if(d.group===true||d.isGroup===true||d.inGroup===true)return 'W grupie';
+    // Brak informacji nie oznacza, ze potwor nie jest w grupie.
+    return '';
+  }
   function previewInfo(hit){
     const p=hit.p,raw=p.raw,d=raw?.d||{},type=hit.type;
     let name=p.name||d.nick||d.name||"Nieznany element",subtitle="",src="",outfits=[];
     if(type==="monster"){
       const labels={monsterNormal:'Potwór',monsterElite:'Elita',monsterElite2:'Elita II',monsterElite3:'Elita III',monsterColossus:'Kolos',monsterHero:'Heros',monsterTitan:'Tytan'};
-      subtitle=[p.lvl?`Poziom: ${p.lvl}`:"",labels[p.monsterClass]||'Potwór'].filter(Boolean).join(" • ");
+      subtitle=[p.lvl?`Poziom: ${p.lvl}`:"",labels[p.monsterClass]||'Potwór',monsterGroupInfo(p)].filter(Boolean).join(" • ");
       src=imageUrl(d.icon||d.img||raw?.icon||raw?.getIcon?.());
     }else if(type==="npc"||type==="object"){
       subtitle=type==="npc"?"NPC":"Obiekt interaktywny";
@@ -538,7 +584,7 @@
     }else if(type==="respawn"){
       subtitle=`Respawn herosa${p.lvl?` • Poziom: ${p.lvl}`:""}${checkedResp.has(`${p.x}:${p.y}:${p.nick}:${p.id??''}`)?" • Sprawdzony":""}`;
     }else if(type==="gateway"){
-      name=p.name||"Przejście";subtitle="Przejście na inną mapę";
+      name=p.name||"Przejście";subtitle=["Przejście na inną mapę",...gatewayRestrictions(p)].join(" • ");
     }
     // Pozycje elementow odczytujemy z danych gry (w kratkach mapy).
     // Dla poruszajacych sie graczy pokazujemy ostatnia otrzymana pozycje,
