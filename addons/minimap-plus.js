@@ -172,8 +172,11 @@
   #ta-mm-settings .ta-colors{max-height:225px;overflow:auto;border:1px solid #31515b;padding:3px 8px;margin:8px 0}
   #ta-mm-settings input[type=color]{width:44px;height:26px;padding:1px;background:transparent;border:1px solid #426873;cursor:pointer}
   #ta-mm-preview .ta-tip-list{font-size:11px;color:#b9c8cd;margin-top:5px}
-  #ta-mm-settings{position:fixed;z-index:8501;width:280px;background:#0e1d23;color:#def;padding:13px;
+  #ta-mm-settings{position:fixed;z-index:8501;width:270px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);box-sizing:border-box;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#426873 #0e1d23;background:#0e1d23;color:#def;padding:11px;
     border:1px solid #327582;border-radius:10px;box-shadow:0 12px 30px #000a;font:12px Arial}
+  #ta-mm-settings::-webkit-scrollbar{width:7px}
+  #ta-mm-settings::-webkit-scrollbar-thumb{background:#426873;border-radius:6px}
+  #ta-mm-settings::-webkit-scrollbar-track{background:#0e1d23}
   #ta-mm-settings label{display:flex;align-items:center;justify-content:space-between;margin:9px 0;gap:8px}
   #ta-mm-settings input[type=number]{width:80px;background:#071217;color:white;border:1px solid #327582;padding:5px}
   #ta-mm-settings button{background:#20464d;color:white;border:1px solid #327582;border-radius:5px;padding:7px;cursor:pointer}
@@ -1008,8 +1011,8 @@
   function openSettings(){
     if(menu){closeSettings();return}
     menu=document.createElement("div");menu.id="ta-mm-settings";document.body.appendChild(menu);
-    menu.style.top=Math.max(10,Math.min(innerHeight-300,(cfg.y||90)))+"px";
-    menu.style.left=Math.max(10,Math.min(innerWidth-300,(cfg.x||100)+cfg.size+8))+"px";
+    menu.style.top=Math.max(12,Math.min(innerHeight-280,(cfg.y||90)))+"px";
+    menu.style.left=Math.max(12,Math.min(innerWidth-282,(cfg.x||100)+cfg.size+8))+"px";
     const colorControls=Object.entries(COLOR_LABELS).map(([key,label])=>`<label>${escapeHtml(label)}<input type="color" data-color="${key}" value="${color(key)}"></label>`).join('');
     menu.innerHTML=`<strong>Minimapa+ — ustawienia</strong>
       <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="1100" value="${cfg.size}"></label>
