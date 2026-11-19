@@ -881,8 +881,9 @@
     // wiec nie przycinamy tutaj znacznikow ani ich interakcji.
     hoverHits=[];
     // Jednakowy rozmiar wszystkich podstawowych znacznikow.
-    // Wiekszy niz w v1.6.67, proporcjonalny do skali mapy.
-    const markerRadius=()=>Math.min(10.5,Math.max(4.0,scale*.44));
+    // Rozmiar oparty na rzeczywistej szerokosci kratki: na gestych mapach male, na malych mapach wieksze.
+    // Srednica <= 86% kratki ogranicza nachodzenie sasiadujacych znacznikow.
+    const markerRadius=()=>Math.min(12,Math.max(1.15,scale*.43));
     const mark=(p,color,radius=3.6,type="object",dim=false)=>{
       radius=markerRadius();
       if(!p||!searchMatches(p,type))return;
