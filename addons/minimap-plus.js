@@ -2,12 +2,15 @@
   "use strict";
   const B=window.TeriashAddons?.bridge;
   if(!B||window.TeriashMinimapPlus)return;
-  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,visibilityFrame:false,visibilityDim:false,rememberMonsters:false,highlightMonsterGroup:true,colors:{}};
+  const KEY="ta.minimapPlus.v1",defaults={visible:false,size:500,x:null,y:90,zoom:1,players:true,npcs:true,objects:false,labels:false,gates:true,terrain:true,monsters:true,items:true,hoverPreview:true,respawns:true,npcIcons:true,visibilityFrame:false,visibilityDim:false,rememberMonsters:false,highlightMonsterGroup:true,hotkey:"KeyQ",colors:{}};
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
   const DEFAULT_COLORS={hero:'#fa0000',player:'#63caff',npc:'#fbff00',object:'#fcff42',gateway:'#0082e6',respawn:'#ff0000',respawnCheckedBorder:'#64ffe9',monsterGroupBorder:'#ff67c8',monsterNormal:'#8f8f8f',monsterElite:'#ff9b48',monsterElite2:'#9800eb',monsterElite3:'#ffbb66',monsterColossus:'#e657ff',monsterHero:'#33eb00',monsterTitan:'#f078df',itemRecovery:'#f240da',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
   const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',respawnCheckedBorder:'Obramówka sprawdzonego respu',monsterGroupBorder:'Obramówka grupy potworów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterElite3:'Elity III',monsterColossus:'Kolosi',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
+  // Stare instalacje domyslnie otrzymuja Q.
+  if(typeof cfg.hotkey!=="string"||!/^((Key[A-Z])|(Digit[0-9])|(F(?:[1-9]|1[0-2])))$/.test(cfg.hotkey))cfg.hotkey="KeyQ";
+  const keyLabel=code=>code.startsWith("Key")?code.slice(3):code.startsWith("Digit")?code.slice(5):code;
   cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
   function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
   // Zrodlo: silnik Margonem, getDescriptionOfKindMonster(wt):
@@ -167,9 +170,12 @@
   css.textContent=`
   #ta-mm{position:fixed;z-index:8500;width:280px;background:#0c181eea;color:#dceaf0;border:1px solid #286b76;
     border-radius:11px;box-shadow:0 10px 32px #0009;font:12px Arial,sans-serif;overflow:hidden;user-select:none}
-  #ta-mm *{box-sizing:border-box}#ta-mm .head{height:33px;display:flex;align-items:center;justify-content:space-between;
-    background:#11262c;cursor:move;padding:0 7px 0 11px;font-weight:700}
-  #ta-mm .ta-mm-search{flex:1;min-width:0;max-width:240px;height:23px;padding:2px 7px;
+  #ta-mm *{box-sizing:border-box}#ta-mm .head{height:33px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,280px) minmax(0,1fr);
+    align-items:center;gap:6px;background:#11262c;cursor:move;padding:0 7px 0 11px;font-weight:700}
+  #ta-mm .ta-mm-head-title{white-space:nowrap;justify-self:start}
+  #ta-mm .ta-mm-search-wrap{display:flex;align-items:center;justify-self:stretch;gap:5px;min-width:0}
+  #ta-mm .ta-mm-head-actions{justify-self:end;white-space:nowrap}
+  #ta-mm .ta-mm-search{flex:1;min-width:0;width:100%;height:23px;padding:2px 7px;
     border:1px solid #386f78;border-radius:5px;background:#071b21;color:#e7f5f8;
     font:12px Arial,sans-serif;outline:none;user-select:text;cursor:text}
   #ta-mm .ta-mm-search:focus{border-color:#5ca5b5}
@@ -1003,7 +1009,7 @@
   function render(){
     if(frame)return;
     frame=document.createElement("div");frame.id="ta-mm";
-    frame.innerHTML='<div class="head"><span>MINIMAPA+</span><input class="ta-mm-search" type="search" placeholder="Szukaj..." aria-label="Szukaj na minimapie" autocomplete="off" spellcheck="false"><span class="ta-mm-search-help" tabindex="0" role="note" aria-label="Szukaj po nazwie, kategorii lub poziomie" title="Szukaj po nazwie, kategorii lub poziomie">i</span><span><button data-act="settings" title="Ustawienia">⚙</button> <button data-act="hide" title="Ukryj">×</button></span></div><canvas></canvas><div class="footer">Ładowanie…</div>';
+    frame.innerHTML='<div class="head"><span class="ta-mm-head-title">MINIMAPA+</span><span class="ta-mm-search-wrap"><input class="ta-mm-search" type="search" placeholder="Szukaj..." aria-label="Szukaj na minimapie" autocomplete="off" spellcheck="false"><span class="ta-mm-search-help" tabindex="0" role="note" aria-label="Informacje o wyszukiwaniu">i</span></span><span class="ta-mm-head-actions"><button data-act="settings" title="Ustawienia">⚙</button> <button data-act="hide" title="Ukryj">×</button></span></div><canvas></canvas><div class="footer">Ładowanie…</div>';
     document.body.appendChild(frame);canvas=frame.querySelector("canvas");ctx=canvas.getContext("2d");lastNativeCursor="";syncNativeCursor();
     tip=document.createElement("div");tip.id="ta-mm-preview";document.body.appendChild(tip);
     canvas.addEventListener("pointermove",e=>{hoverPos={x:e.clientX,y:e.clientY};updatePreview()});
@@ -1048,6 +1054,7 @@
     menu.style.left=Math.max(12,Math.min(innerWidth-282,(cfg.x||100)+cfg.size+8))+"px";
     const colorControls=Object.entries(COLOR_LABELS).map(([key,label])=>`<label>${escapeHtml(label)}<input type="color" data-color="${key}" value="${color(key)}"></label>`).join('');
     menu.innerHTML=`<div class="ta-settings-body"><strong>Minimapa+ — ustawienia</strong>
+      <label>Klawisz otwierania minimapy<input type="text" data-k="hotkey" value="${keyLabel(cfg.hotkey)}" readonly title="Kliknij i nacisnij wybrany klawisz. Escape anuluje, Backspace ustawia Q."></label>
       <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="1100" value="${cfg.size}"></label>
       <label>Gracze<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
       <label>NPC<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
@@ -1068,12 +1075,27 @@
       <div class="ta-settings-footer"><button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
       <button data-a="save">Zapisz</button><button data-a="close">Zamknij</button></div>
       `;
+    const hotkeyInput=menu.querySelector('[data-k="hotkey"]');
+    let pendingHotkey=cfg.hotkey;
+    hotkeyInput.addEventListener("focus",()=>{hotkeyInput.value="Naciśnij klawisz…"});
+    hotkeyInput.addEventListener("blur",()=>{hotkeyInput.value=keyLabel(pendingHotkey)});
+    hotkeyInput.addEventListener("keydown",event=>{
+      event.preventDefault();event.stopImmediatePropagation();
+      if(event.code==="Escape"){hotkeyInput.blur();return}
+      if(event.code==="Backspace"||event.code==="Delete"){
+        pendingHotkey="KeyQ";hotkeyInput.value="Q";hotkeyInput.blur();return;
+      }
+      if(event.repeat||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey)return;
+      if(!/^((Key[A-Z])|(Digit[0-9])|(F(?:[1-9]|1[0-2])))$/.test(event.code))return;
+      pendingHotkey=event.code;hotkeyInput.value=keyLabel(pendingHotkey);hotkeyInput.blur();
+    },true);
     menu.querySelector('[data-a="resetcolors"]').onclick=()=>{
       menu.querySelectorAll('[data-color]').forEach(input=>input.value=DEFAULT_COLORS[input.dataset.color]);
     };
     menu.querySelector('[data-a="close"]').onclick=closeSettings;
     menu.querySelector('[data-a="save"]').onclick=()=>{
       for(const k of ["players","npcs","monsters","items","gates","respawns","labels","terrain","objects","hoverPreview","npcIcons","visibilityFrame","visibilityDim","rememberMonsters","highlightMonsterGroup"])cfg[k]=menu.querySelector(`[data-k="${k}"]`).checked;
+      cfg.hotkey=pendingHotkey;
       cfg.size=Math.max(160,Math.min(1100,Number(menu.querySelector('[data-k="size"]').value)||500));
        cfg.zoom=1;
       menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
@@ -1082,9 +1104,9 @@
   }
   function closeSettings(){menu?.remove();menu=null}
   function toggle(){cfg.visible=!cfg.visible;save();cfg.visible?render():closeView()}
-  // Q toggles our minimap only while playing, never while typing.
+  // Skrot konfigurowalny; dziala tylko w grze i nie przechwytuje pisania.
   function onKeyDown(event){
-    if(event.code!=="KeyQ" || event.repeat || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey)return;
+    if(event.code!==cfg.hotkey || event.repeat || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey)return;
     const el=event.target;
     if(el?.isContentEditable || el?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]'))return;
     if(!window.Engine)return;
@@ -1102,12 +1124,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.33',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.34',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.33'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.34'};
   if(cfg.visible)render();
 })();
