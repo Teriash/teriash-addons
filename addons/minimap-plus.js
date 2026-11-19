@@ -7,7 +7,7 @@
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
   const DEFAULT_COLORS={hero:'#fa0000',player:'#63caff',npc:'#fbff00',object:'#fcff42',gateway:'#0082e6',respawn:'#ff0000',respawnCheckedBorder:'#64ffe9',monsterGroupBorder:'#ff67c8',monsterNormal:'#8f8f8f',monsterElite:'#ff9b48',monsterElite2:'#9800eb',monsterElite3:'#ffbb66',monsterColossus:'#e657ff',monsterHero:'#33eb00',monsterTitan:'#f078df',itemRecovery:'#f240da',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
-  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',respawnCheckedBorder:'Obramówka sprawdzonego respu',monsterGroupBorder:'Obramówka grupy potworów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterElite3:'Elity III',monsterColossus:'Kolosy',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
+  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',respawnCheckedBorder:'Obramówka sprawdzonego respu',monsterGroupBorder:'Obramówka grupy potworów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterElite3:'Elity III',monsterColossus:'Kolosi',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
   cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
   function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
   // Zrodlo: silnik Margonem, getDescriptionOfKindMonster(wt):
@@ -174,6 +174,15 @@
     font:12px Arial,sans-serif;outline:none;user-select:text;cursor:text}
   #ta-mm .ta-mm-search:focus{border-color:#5ca5b5}
   #ta-mm .ta-mm-search::placeholder{color:#92abb2}
+  #ta-mm .ta-mm-search-help{position:relative;display:inline-flex;align-items:center;justify-content:center;
+    flex:0 0 16px;width:16px;height:16px;border:1px solid #81a8b1;border-radius:50%;
+    color:#c5e1e8;font:bold 11px Arial,sans-serif;cursor:help;user-select:none}
+  #ta-mm .ta-mm-search-help::after{content:"Szukaj po nazwie, kategorii lub poziomie";
+    display:none;position:absolute;z-index:12;top:calc(100% + 10px);right:-8px;
+    width:210px;white-space:normal;padding:8px 10px;background:#101e24;
+    color:#e4f3f7;border:1px solid #477781;border-radius:6px;
+    box-shadow:0 5px 18px #0009;font:12px/1.45 Arial,sans-serif;pointer-events:none}
+  #ta-mm .ta-mm-search-help:hover::after,#ta-mm .ta-mm-search-help:focus::after{display:block}
   #ta-mm button{background:#19343b;border:1px solid #386f78;border-radius:5px;color:#def;padding:3px 7px;cursor:pointer}
   #ta-mm canvas{display:block;width:100%;aspect-ratio:1;background:#132126;cursor:var(--ta-mm-game-cursor, auto)}
   #ta-mm .footer{font-size:11px;color:#a8c1c9;padding:6px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -603,7 +612,7 @@
     const p=hit.p,raw=p.raw,d=raw?.d||{},type=hit.type;
     let name=p.name||d.nick||d.name||"Nieznany element",subtitle="",src="",outfits=[];
     if(type==="monster"){
-      const labels={monsterNormal:'Potwór',monsterElite:'Elita',monsterElite2:'Elita II',monsterElite3:'Elita III',monsterColossus:'Kolos',monsterHero:'Heros',monsterTitan:'Tytan'};
+      const labels={monsterNormal:'Zwykły',monsterElite:'Elita',monsterElite2:'Elita II',monsterElite3:'Elita III',monsterColossus:'Kolos',monsterHero:'Heros',monsterTitan:'Tytan'};
       subtitle=[p.lvl?`Poziom: ${p.lvl}`:"",labels[p.monsterClass]||'Potwór',monsterGroupInfo(p)].filter(Boolean).join(" • ");
       src=imageUrl(d.icon||d.img||raw?.icon||raw?.getIcon?.());
     }else if(type==="npc"||type==="object"){
@@ -994,7 +1003,7 @@
   function render(){
     if(frame)return;
     frame=document.createElement("div");frame.id="ta-mm";
-    frame.innerHTML='<div class="head"><span>MINIMAPA+</span><input class="ta-mm-search" type="search" placeholder="Szukaj..." aria-label="Szukaj na minimapie" autocomplete="off" spellcheck="false"><span><button data-act="settings" title="Ustawienia">⚙</button> <button data-act="hide" title="Ukryj">×</button></span></div><canvas></canvas><div class="footer">Ładowanie…</div>';
+    frame.innerHTML='<div class="head"><span>MINIMAPA+</span><input class="ta-mm-search" type="search" placeholder="Szukaj..." aria-label="Szukaj na minimapie" autocomplete="off" spellcheck="false"><span class="ta-mm-search-help" tabindex="0" role="note" aria-label="Szukaj po nazwie, kategorii lub poziomie" title="Szukaj po nazwie, kategorii lub poziomie">i</span><span><button data-act="settings" title="Ustawienia">⚙</button> <button data-act="hide" title="Ukryj">×</button></span></div><canvas></canvas><div class="footer">Ładowanie…</div>';
     document.body.appendChild(frame);canvas=frame.querySelector("canvas");ctx=canvas.getContext("2d");lastNativeCursor="";syncNativeCursor();
     tip=document.createElement("div");tip.id="ta-mm-preview";document.body.appendChild(tip);
     canvas.addEventListener("pointermove",e=>{hoverPos={x:e.clientX,y:e.clientY};updatePreview()});
@@ -1025,7 +1034,7 @@
     frame.querySelector('[data-act="settings"]').onclick=openSettings;
     frame.querySelector('[data-act="hide"]').onclick=()=>{cfg.visible=false;save();closeView()};
     const head=frame.querySelector(".head");
-    head.addEventListener("pointerdown",e=>{if(e.target.closest("button, input"))return;drag={x:e.clientX,y:e.clientY,left:cfg.x,top:cfg.y};head.setPointerCapture(e.pointerId)});
+    head.addEventListener("pointerdown",e=>{if(e.target.closest("button, input, .ta-mm-search-help"))return;drag={x:e.clientX,y:e.clientY,left:cfg.x,top:cfg.y};head.setPointerCapture(e.pointerId)});
     head.addEventListener("pointermove",e=>{if(!drag)return;cfg.x=drag.left+e.clientX-drag.x;cfg.y=drag.top+e.clientY-drag.y;place()});
     head.addEventListener("pointerup",()=>{drag=null;save()});
     // Scroll nie zmienia skali mapy; rozmiar okna reguluje tylko opcja Rozmiar (px).
