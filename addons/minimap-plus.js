@@ -6,7 +6,7 @@
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
-  const DEFAULT_COLORS={hero:'#f9dd56',player:'#63caff',npc:'#46d787',object:'#9ba7ae',gateway:'#ae83ff',respawn:'#ffad4d',monsterNormal:'#ef5555',monsterElite:'#ff9b48',monsterElite2:'#ffdf55',monsterElite3:'#ffbb66',monsterColossus:'#e657ff',monsterHero:'#a87bff',monsterTitan:'#f078df',itemRecovery:'#f3a74c',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
+  const DEFAULT_COLORS={hero:'#fa0000',player:'#63caff',npc:'#fbff00',object:'#fcff42',gateway:'#0082e6',respawn:'#ff0000',monsterNormal:'#8f8f8f',monsterElite:'#ff9b48',monsterElite2:'#9800eb',monsterElite3:'#ffbb66',monsterColossus:'#e657ff',monsterHero:'#33eb00',monsterTitan:'#f078df',itemRecovery:'#f240da',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
   const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterElite3:'Elity III',monsterColossus:'Kolosy',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
   cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
   function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
@@ -172,8 +172,13 @@
   #ta-mm-settings .ta-colors{max-height:225px;overflow:auto;border:1px solid #31515b;padding:3px 8px;margin:8px 0}
   #ta-mm-settings input[type=color]{width:44px;height:26px;padding:1px;background:transparent;border:1px solid #426873;cursor:pointer}
   #ta-mm-preview .ta-tip-list{font-size:11px;color:#b9c8cd;margin-top:5px}
-  #ta-mm-settings{position:fixed;z-index:8501;width:270px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);box-sizing:border-box;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#426873 #0e1d23;background:#0e1d23;color:#def;padding:11px;
+  #ta-mm-settings{position:fixed;z-index:8501;width:270px;max-width:calc(100vw - 24px);height:min(620px, calc(100vh - 24px));box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#426873 #0e1d23;background:#0e1d23;color:#def;padding:11px;
     border:1px solid #327582;border-radius:10px;box-shadow:0 12px 30px #000a;font:12px Arial}
+  #ta-mm-settings .ta-settings-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#426873 #0e1d23;padding-right:4px}
+  #ta-mm-settings .ta-settings-footer{flex-shrink:0;border-top:1px solid #31515b;margin-top:8px;padding-top:8px;display:flex;flex-wrap:wrap;gap:5px}
+  #ta-mm-settings .ta-settings-footer button{padding:6px 7px}
+  #ta-mm-settings .ta-settings-body::-webkit-scrollbar,#ta-mm-settings .ta-colors::-webkit-scrollbar{width:7px}
+  #ta-mm-settings .ta-settings-body::-webkit-scrollbar-thumb,#ta-mm-settings .ta-colors::-webkit-scrollbar-thumb{background:#426873;border-radius:6px}
   #ta-mm-settings::-webkit-scrollbar{width:7px}
   #ta-mm-settings::-webkit-scrollbar-thumb{background:#426873;border-radius:6px}
   #ta-mm-settings::-webkit-scrollbar-track{background:#0e1d23}
@@ -1014,12 +1019,12 @@
     menu.style.top=Math.max(12,Math.min(innerHeight-280,(cfg.y||90)))+"px";
     menu.style.left=Math.max(12,Math.min(innerWidth-282,(cfg.x||100)+cfg.size+8))+"px";
     const colorControls=Object.entries(COLOR_LABELS).map(([key,label])=>`<label>${escapeHtml(label)}<input type="color" data-color="${key}" value="${color(key)}"></label>`).join('');
-    menu.innerHTML=`<strong>Minimapa+ — ustawienia</strong>
+    menu.innerHTML=`<div class="ta-settings-body"><strong>Minimapa+ — ustawienia</strong>
       <label>Rozmiar (px)<input type="number" data-k="size" min="160" max="1100" value="${cfg.size}"></label>
-      <label>Gracze (niebieskie kwadraty)<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
-      <label>NPC (zielone kwadraty)<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
-      <label>Znaczniki NPC (oryginalne ikony gry)<input type="checkbox" data-k="npcIcons" ${cfg.npcIcons!==false?"checked":""}></label>
-      <label>Potwory (czerwone kwadraty)<input type="checkbox" data-k="monsters" ${cfg.monsters!==false?"checked":""}></label>
+      <label>Gracze<input type="checkbox" data-k="players" ${cfg.players?"checked":""}></label>
+      <label>NPC<input type="checkbox" data-k="npcs" ${cfg.npcs?"checked":""}></label>
+      <label>Znaczniki nad NPC<input type="checkbox" data-k="npcIcons" ${cfg.npcIcons!==false?"checked":""}></label>
+      <label>Potwory<input type="checkbox" data-k="monsters" ${cfg.monsters!==false?"checked":""}></label>
       <label>Przedmioty (odradzające się i wyrzucone)<input type="checkbox" data-k="items" ${cfg.items!==false?"checked":""}></label>
       <label>Teren z grafiki mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
       <label>Obiekty interaktywne<input type="checkbox" data-k="objects" ${cfg.objects?"checked":""}></label>
@@ -1031,9 +1036,9 @@
       <label>Zapamiętuj potwory poza mgłą (przygaszone)<input type="checkbox" data-k="rememberMonsters" ${cfg.rememberMonsters?"checked":""}></label>
       <label>Podświetl grupę potworów po najechaniu (różowa ramka)<input type="checkbox" data-k="highlightMonsterGroup" ${cfg.highlightMonsterGroup!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
-      <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div>
-      <button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
-      <button data-a="save">Zapisz</button> <button data-a="close">Zamknij</button>
+      <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div></div>
+      <div class="ta-settings-footer"><button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
+      <button data-a="save">Zapisz</button><button data-a="close">Zamknij</button></div>
       `;
     menu.querySelector('[data-a="resetcolors"]').onclick=()=>{
       menu.querySelectorAll('[data-color]').forEach(input=>input.value=DEFAULT_COLORS[input.dataset.color]);
@@ -1069,12 +1074,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.24',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.32',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.24'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.32'};
   if(cfg.visible)render();
 })();
