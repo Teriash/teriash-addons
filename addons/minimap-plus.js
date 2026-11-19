@@ -559,7 +559,7 @@
   // Jedno wykrywanie grupy dla wszystkich rang NPC.
   // groupType oraz oryginalny tooltip nie zaleza od getKind()/wt.
   function monsterGroupInfo(p){
-    if(p?.inGroup===true)return 'W grupie';
+    if(p?.inGroup===true||monsterGroupId(p)!==null)return 'W grupie';
     const raw=p?.raw;
     const d=raw?.d||{};
     if(d.group===true||d.isGroup===true||d.inGroup===true)return 'W grupie';
@@ -574,36 +574,19 @@
     if(/w\s+grupie/i.test(nativeDescription(p,'monster')))return 'W grupie';
     return '';
   }
-  // groupType is a group *type*, not a unique group identifier.
-  // Only explicit instance identifiers are safe to use as exact membership.
+  // Margonem: d.grp is the actual group instance identifier.
+  // groupType describes the type of grouping, NOT membership identity.
   function monsterGroupId(p){
-    const d=p?.raw?.d||p||{};
-    for(const key of ['groupId','groupID','group_id','grpId','groupUid','groupInstanceId']){
-      const value=d[key];
-      if(value!==undefined&&value!==null&&value!==''&&value!==false)return String(value);
-    }
-    return null;
+    const d=p?.raw?.d||{};
+    const value=d.grp??p?.grp??p?.groupId;
+    return value===undefined||value===null||value===''?null:String(value);
   }
   function monsterGroupMembers(selected,markers){
     if(!selected||monsterGroupInfo(selected)!=='W grupie')return [];
-    const selectedId=monsterGroupId(selected);
-    if(selectedId!=null){
-      return markers.filter(p=>monsterGroupInfo(p)==='W grupie'&&monsterGroupId(p)===selectedId);
-    }
-    // The client does not expose a confirmed group-instance ID for every NPC.
-    // Fallback: only nearby connected monsters marked by the game as grouped.
-    // This is an approximation, not proof that all are in the same battle group.
-    const members=[selected],visited=new Set([rememberedMonsterKey(selected)]);
-    for(let i=0;i<members.length;i++){
-      const a=members[i];
-      for(const b of markers){
-        const id=rememberedMonsterKey(b);
-        if(id==null||visited.has(id)||monsterGroupInfo(b)!=='W grupie')continue;
-        if(Math.hypot(Number(a.x)-Number(b.x),Number(a.y)-Number(b.y))>2.3)continue;
-        visited.add(id);members.push(b);
-      }
-    }
-    return members;
+    const group=monsterGroupId(selected);
+    // Never infer exact membership from proximity: adjacent groups may overlap.
+    if(group===null)return [selected];
+    return markers.filter(p=>monsterGroupId(p)===group);
   }
   function previewInfo(hit){
     const p=hit.p,raw=p.raw,d=raw?.d||{},type=hit.type;
@@ -764,8 +747,11 @@
       add(p);
     }
     for(const [id,p] of candidates){
+      const previous=rememberedMonsters.get(id);
       rememberedMonsters.set(id,{id,x:p.x,y:p.y,name:p.name,lvl:p.lvl,
-        monsterClass:p.monsterClass,kind:p.kind,inGroup:monsterGroupInfo(p)==='W grupie',groupId:monsterGroupId(p),lastSeen:now});
+        monsterClass:p.monsterClass,kind:p.kind,
+        inGroup:monsterGroupInfo(p)==='W grupie'||previous?.inGroup===true,
+        groupId:monsterGroupId(p)??previous?.groupId??null,lastSeen:now});
     }
     const ghosts=[];
     for(const [id,p] of rememberedMonsters){
