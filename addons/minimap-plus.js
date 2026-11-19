@@ -880,10 +880,9 @@
     // Oryginalna minimapa nie filtruje NPC na podstawie visibility,
     // wiec nie przycinamy tutaj znacznikow ani ich interakcji.
     hoverHits=[];
-    // Wszystkie podstawowe znaczniki maja ten sam rozmiar w danej skali.
-    // Zajmuja do 64% szerokosci kratki; ograniczenia zapobiegaja
-    // ogromnym kwadratom na malych mapach i mikroskopijnym na duzych.
-    const markerRadius=()=>Math.min(6.5,Math.max(2.2,scale*.32));
+    // Jednakowy rozmiar wszystkich podstawowych znacznikow.
+    // Wiekszy niz w v1.6.67, proporcjonalny do skali mapy.
+    const markerRadius=()=>Math.min(10.5,Math.max(4.0,scale*.44));
     const mark=(p,color,radius=3.6,type="object",dim=false)=>{
       radius=markerRadius();
       if(!p||!searchMatches(p,type))return;
