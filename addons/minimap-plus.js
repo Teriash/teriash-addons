@@ -880,20 +880,25 @@
     // Oryginalna minimapa nie filtruje NPC na podstawie visibility,
     // wiec nie przycinamy tutaj znacznikow ani ich interakcji.
     hoverHits=[];
-    // Wielkosc znacznika rosnie wraz z wielkoscia pojedynczej kratki,
-    // ale pozostaje czytelna i nie zajmuje calej kratki na malych mapach.
-    // Na malych mapach kratki sa duze: ikony maja wyraznie rosnac,
-    // ale nie zaslaniac calej kratki. Rozmiar zalezy od skali mapy.
-    const markerRadius=(base)=>Math.max(base,Math.min(base*3.3,scale*.43));
+    // Wszystkie podstawowe znaczniki maja ten sam rozmiar w danej skali.
+    // Zajmuja do 64% szerokosci kratki; ograniczenia zapobiegaja
+    // ogromnym kwadratom na malych mapach i mikroskopijnym na duzych.
+    const markerRadius=()=>Math.min(6.5,Math.max(2.2,scale*.32));
     const mark=(p,color,radius=3.6,type="object",dim=false)=>{
-      radius=markerRadius(radius);
+      radius=markerRadius();
       if(!p||!searchMatches(p,type))return;
       const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
       if(x<0||x>s||y<0||y>s)return;
       hoverHits.push({p,x,y,radius,type});
       ctx.save();if(dim)ctx.globalAlpha=.40;
-      ctx.fillStyle=color;ctx.strokeStyle='#081217';ctx.lineWidth=1.2;
-      ctx.fillRect(x-radius,y-radius,2*radius,2*radius);ctx.strokeRect(x-radius,y-radius,2*radius,2*radius);
+      ctx.fillStyle=color;ctx.strokeStyle='#081217';ctx.lineWidth=Math.min(1.2,Math.max(.7,radius*.22));
+      if(type==='item'){
+        // Przedmioty odradzajace sie i wyrzucone: okragle znaczniki.
+        ctx.beginPath();ctx.arc(x,y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
+      }else{
+        ctx.fillRect(x-radius,y-radius,2*radius,2*radius);
+        ctx.strokeRect(x-radius,y-radius,2*radius,2*radius);
+      }
       if(cfg.labels&&p.name){ctx.font='10px Arial';ctx.fillStyle='#fff';ctx.fillText(p.name,x+radius+3,y-4)}
       ctx.restore();
     };
@@ -955,7 +960,7 @@
         if(x<0||x>s||y<0||y>s)continue;
         ctx.save();
         // Ramka przylega do obwodu znacznika respa (bez duzego marginesu).
-        const half=markerRadius(4)+1.2;
+        const half=markerRadius()+1.2;
         ctx.strokeStyle=color('respawnCheckedBorder');ctx.lineWidth=2;
         ctx.shadowColor=color('respawnCheckedBorder');ctx.shadowBlur=1;
         ctx.strokeRect(x-half,y-half,half*2,half*2);
