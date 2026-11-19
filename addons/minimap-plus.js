@@ -6,8 +6,8 @@
   let cfg={...defaults,...(B.getValue(KEY,{})||{})};
    // Brak zoomu: takze starsze zapisane ustawienia nie moga go przywrocic.
    cfg.zoom=1;
-  const DEFAULT_COLORS={hero:'#fa0000',player:'#63caff',npc:'#fbff00',object:'#fcff42',gateway:'#0082e6',respawn:'#ff0000',monsterNormal:'#8f8f8f',monsterElite:'#ff9b48',monsterElite2:'#9800eb',monsterElite3:'#ffbb66',monsterColossus:'#e657ff',monsterHero:'#33eb00',monsterTitan:'#f078df',itemRecovery:'#f240da',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
-  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterElite3:'Elity III',monsterColossus:'Kolosy',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
+  const DEFAULT_COLORS={hero:'#fa0000',player:'#63caff',npc:'#fbff00',object:'#fcff42',gateway:'#0082e6',respawn:'#ff0000',respawnCheckedBorder:'#64ffe9',monsterGroupBorder:'#ff67c8',monsterNormal:'#8f8f8f',monsterElite:'#ff9b48',monsterElite2:'#9800eb',monsterElite3:'#ffbb66',monsterColossus:'#e657ff',monsterHero:'#33eb00',monsterTitan:'#f078df',itemRecovery:'#f240da',itemNormal:'#f1f5f9',itemUnique:'#ff9b48',itemHeroic:'#58d7ff',itemLegendary:'#ffd15a'};
+  const COLOR_LABELS={hero:'Moja postać',player:'Inni gracze',npc:'NPC',object:'Obiekty interaktywne',gateway:'Przejścia',respawn:'Respawny herosów',respawnCheckedBorder:'Obramówka sprawdzonego respu',monsterGroupBorder:'Obramówka grupy potworów',monsterNormal:'Potwory zwykłe',monsterElite:'Elity',monsterElite2:'Elity II',monsterElite3:'Elity III',monsterColossus:'Kolosy',monsterHero:'Herosi',monsterTitan:'Tytani',itemRecovery:'Przedmioty odradzające się',itemNormal:'Przedmioty zwykłe',itemUnique:'Przedmioty unikatowe',itemHeroic:'Przedmioty heroiczne',itemLegendary:'Przedmioty legendarne'};
   cfg.colors={...DEFAULT_COLORS,...(cfg.colors||{})};
   function color(key){return /^#[0-9a-f]{6}$/i.test(cfg.colors[key]||'')?cfg.colors[key]:DEFAULT_COLORS[key]}
   // Zrodlo: silnik Margonem, getDescriptionOfKindMonster(wt):
@@ -925,8 +925,8 @@
         ctx.save();
         // Ramka przylega do obwodu znacznika respa (bez duzego marginesu).
         const half=markerRadius(4)+1.2;
-        ctx.strokeStyle='#64ffe9';ctx.lineWidth=2;
-        ctx.shadowColor='#64ffe9';ctx.shadowBlur=1;
+        ctx.strokeStyle=color('respawnCheckedBorder');ctx.lineWidth=2;
+        ctx.shadowColor=color('respawnCheckedBorder');ctx.shadowBlur=1;
         ctx.strokeRect(x-half,y-half,half*2,half*2);
         ctx.restore();
       }
@@ -945,8 +945,8 @@
         for(const hit of hoverHits){
           if(hit.type!=='monster'||!ids.has(rememberedMonsterKey(hit.p)))continue;
           const r=hit.radius+2;
-          ctx.save();ctx.strokeStyle='#ff67c8';ctx.lineWidth=2.4;
-          ctx.shadowColor='#ff56c4';ctx.shadowBlur=5;
+          ctx.save();ctx.strokeStyle=color('monsterGroupBorder');ctx.lineWidth=2.4;
+          ctx.shadowColor=color('monsterGroupBorder');ctx.shadowBlur=5;
           ctx.strokeRect(hit.x-r,hit.y-r,r*2,r*2);ctx.restore();
         }
       }
@@ -1026,15 +1026,15 @@
       <label>Znaczniki nad NPC<input type="checkbox" data-k="npcIcons" ${cfg.npcIcons!==false?"checked":""}></label>
       <label>Potwory<input type="checkbox" data-k="monsters" ${cfg.monsters!==false?"checked":""}></label>
       <label>Przedmioty (odradzające się i wyrzucone)<input type="checkbox" data-k="items" ${cfg.items!==false?"checked":""}></label>
-      <label>Teren z grafiki mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
+      <label>Grafika mapy<input type="checkbox" data-k="terrain" ${cfg.terrain!==false?"checked":""}></label>
       <label>Obiekty interaktywne<input type="checkbox" data-k="objects" ${cfg.objects?"checked":""}></label>
-      <label>Respawny herosów (turkusowa ramka po podejściu)<input type="checkbox" data-k="respawns" ${cfg.respawns!==false?"checked":""}></label>
+      <label>Respawny herosów<input type="checkbox" data-k="respawns" ${cfg.respawns!==false?"checked":""}></label>
       <label>Przejścia (fioletowe kwadraty)<input type="checkbox" data-k="gates" ${cfg.gates!==false?"checked":""}></label>
       <label>Podgląd elementów po najechaniu<input type="checkbox" data-k="hoverPreview" ${cfg.hoverPreview!==false?"checked":""}></label>
-      <label>Żółta ramka mgły wojny<input type="checkbox" data-k="visibilityFrame" ${cfg.visibilityFrame?"checked":""}></label>
+      <label>Ramka mgły wojny<input type="checkbox" data-k="visibilityFrame" ${cfg.visibilityFrame?"checked":""}></label>
       <label>Przyciemnij poza ramką<input type="checkbox" data-k="visibilityDim" ${cfg.visibilityDim?"checked":""}></label>
-      <label>Zapamiętuj potwory poza mgłą (przygaszone)<input type="checkbox" data-k="rememberMonsters" ${cfg.rememberMonsters?"checked":""}></label>
-      <label>Podświetl grupę potworów po najechaniu (różowa ramka)<input type="checkbox" data-k="highlightMonsterGroup" ${cfg.highlightMonsterGroup!==false?"checked":""}></label>
+      <label>Zapamiętuj potwory poza mgłą<input type="checkbox" data-k="rememberMonsters" ${cfg.rememberMonsters?"checked":""}></label>
+      <label>Podświetl grupę potworów po najechaniu<input type="checkbox" data-k="highlightMonsterGroup" ${cfg.highlightMonsterGroup!==false?"checked":""}></label>
       <label>Podpisy<input type="checkbox" data-k="labels" ${cfg.labels?"checked":""}></label>
       <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div></div>
       <div class="ta-settings-footer"><button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
@@ -1049,7 +1049,7 @@
       cfg.size=Math.max(160,Math.min(1100,Number(menu.querySelector('[data-k="size"]').value)||500));
        cfg.zoom=1;
       menu.querySelectorAll('[data-color]').forEach(input=>{cfg.colors[input.dataset.color]=input.value});
-      save();place();closeSettings();
+      save();place();
     };
   }
   function closeSettings(){menu?.remove();menu=null}
@@ -1074,12 +1074,12 @@
       groups[kind]=(groups[kind]||0)+1;
     }
     const m=getMarkers(e);
-    const result={version:'0.5.32',map:e?.map?.d?.name,rawNpcs:raw.length,
+    const result={version:'0.5.33',map:e?.map?.d?.name,rawNpcs:raw.length,
       groups,monsters:m.monsters.length,npcs:m.npcs.length,
       groundItems:safeGroundItems(e).length,items:m.items.length};
     console.table(result.groups);console.log('[Minimapa+] Diagnostyka',result);
     return result;
   }
-  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.32'};
+  window.TeriashMinimapPlus={openSettings,toggle,destroy,diagnostics,version:'0.5.33'};
   if(cfg.visible)render();
 })();
