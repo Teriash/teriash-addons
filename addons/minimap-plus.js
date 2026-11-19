@@ -49,6 +49,16 @@
 
   const engine=()=>window.Engine;
   let frame,canvas,ctx,menu,drag=null,raf=0,lastMap="",note="",tip=null,hoverHits=[],hoverPos=null,hoverKey="",hoveredMonsterId=null;
+  // Filtr dotyczy tylko wyswietlania; dane potworow i respow nadal sa aktualizowane w tle.
+  let searchQuery="";
+  function searchMatches(p,category=""){
+    const query=searchQuery.trim().toLocaleLowerCase("pl");
+    if(!query)return true;
+    const fields=[p?.name,p?.nick,p?.raw?.d?.nick,p?.raw?.d?.name,
+      p?.lvl,p?.level,p?.raw?.d?.lvl,category,p?.kind,
+      p?.monsterClass&&COLOR_LABELS[p.monsterClass]];
+    return fields.some(v=>v!=null&&String(v).toLocaleLowerCase("pl").includes(query));
+  }
   // Render do 60 FPS. Probkowanie obiektow czesciej, bez czekania na
   // pelny krok animacji. Ruch jest animowany w pikselach, nie skokowo po kratkach.
   let markerSnapshot=null,lastSampleAt=0,renderMapKey=null;
@@ -159,6 +169,11 @@
     border-radius:11px;box-shadow:0 10px 32px #0009;font:12px Arial,sans-serif;overflow:hidden;user-select:none}
   #ta-mm *{box-sizing:border-box}#ta-mm .head{height:33px;display:flex;align-items:center;justify-content:space-between;
     background:#11262c;cursor:move;padding:0 7px 0 11px;font-weight:700}
+  #ta-mm .ta-mm-search{flex:1;min-width:0;max-width:240px;height:23px;padding:2px 7px;
+    border:1px solid #386f78;border-radius:5px;background:#071b21;color:#e7f5f8;
+    font:12px Arial,sans-serif;outline:none;user-select:text;cursor:text}
+  #ta-mm .ta-mm-search:focus{border-color:#5ca5b5}
+  #ta-mm .ta-mm-search::placeholder{color:#92abb2}
   #ta-mm button{background:#19343b;border:1px solid #386f78;border-radius:5px;color:#def;padding:3px 7px;cursor:pointer}
   #ta-mm canvas{display:block;width:100%;aspect-ratio:1;background:#132126;cursor:var(--ta-mm-game-cursor, auto)}
   #ta-mm .footer{font-size:11px;color:#a8c1c9;padding:6px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -371,6 +386,7 @@
     if(cfg.npcIcons===false)return;
     const iconSize=Math.max(12,Math.min(25,scale*1.3));
     for(const p of npcs){
+      if(!searchMatches(p,"NPC"))continue;
       const actions=p.npcActions||[];
       if(!actions.length)continue;
       const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
@@ -856,7 +872,7 @@
     const markerRadius=(base)=>Math.max(base,Math.min(base*3.3,scale*.43));
     const mark=(p,color,radius=3.6,type="object",dim=false)=>{
       radius=markerRadius(radius);
-      if(!p)return;
+      if(!p||!searchMatches(p,type))return;
       const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
       if(x<0||x>s||y<0||y>s)return;
       hoverHits.push({p,x,y,radius,type});
@@ -919,7 +935,7 @@
     if(cfg.respawns!==false){
       for(const p of respPoints){
         const key=respKey(p);
-        if(!checkedResp.has(key)||respHasHero(p,occupiedHeroRespawns))continue;
+        if(!searchMatches({...p,name:p.nick},"respawn")||!checkedResp.has(key)||respHasHero(p,occupiedHeroRespawns))continue;
         const x=ox+(p.x+.5)*scale,y=oy+(p.y+.5)*scale;
         if(x<0||x>s||y<0||y>s)continue;
         ctx.save();
@@ -978,7 +994,7 @@
   function render(){
     if(frame)return;
     frame=document.createElement("div");frame.id="ta-mm";
-    frame.innerHTML='<div class="head"><span>MINIMAPA+</span><span><button data-act="settings" title="Ustawienia">⚙</button> <button data-act="hide" title="Ukryj">×</button></span></div><canvas></canvas><div class="footer">Ładowanie…</div>';
+    frame.innerHTML='<div class="head"><span>MINIMAPA+</span><input class="ta-mm-search" type="search" placeholder="Szukaj..." aria-label="Szukaj na minimapie" autocomplete="off" spellcheck="false"><span><button data-act="settings" title="Ustawienia">⚙</button> <button data-act="hide" title="Ukryj">×</button></span></div><canvas></canvas><div class="footer">Ładowanie…</div>';
     document.body.appendChild(frame);canvas=frame.querySelector("canvas");ctx=canvas.getContext("2d");lastNativeCursor="";syncNativeCursor();
     tip=document.createElement("div");tip.id="ta-mm-preview";document.body.appendChild(tip);
     canvas.addEventListener("pointermove",e=>{hoverPos={x:e.clientX,y:e.clientY};updatePreview()});
@@ -1003,10 +1019,13 @@
       try{eng.hero.autoGoTo({x,y},false)}
       catch(error){console.warn("[Minimapa+] Nie udalo sie rozpoczac ruchu:",error)}
     });
+    const searchInput=frame.querySelector(".ta-mm-search");
+    searchInput.value=searchQuery;
+    searchInput.addEventListener("input",()=>{searchQuery=searchInput.value;hoverPos=null;hidePreview()});
     frame.querySelector('[data-act="settings"]').onclick=openSettings;
     frame.querySelector('[data-act="hide"]').onclick=()=>{cfg.visible=false;save();closeView()};
     const head=frame.querySelector(".head");
-    head.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;drag={x:e.clientX,y:e.clientY,left:cfg.x,top:cfg.y};head.setPointerCapture(e.pointerId)});
+    head.addEventListener("pointerdown",e=>{if(e.target.closest("button, input"))return;drag={x:e.clientX,y:e.clientY,left:cfg.x,top:cfg.y};head.setPointerCapture(e.pointerId)});
     head.addEventListener("pointermove",e=>{if(!drag)return;cfg.x=drag.left+e.clientX-drag.x;cfg.y=drag.top+e.clientY-drag.y;place()});
     head.addEventListener("pointerup",()=>{drag=null;save()});
     // Scroll nie zmienia skali mapy; rozmiar okna reguluje tylko opcja Rozmiar (px).
