@@ -556,36 +556,23 @@
     }
     return [...new Set(notes)];
   }
-  // Jedno wykrywanie grupy dla wszystkich rang NPC.
-  // groupType oraz oryginalny tooltip nie zaleza od getKind()/wt.
-  function monsterGroupInfo(p){
-    if(p?.inGroup===true||monsterGroupId(p)!==null)return 'W grupie';
-    const raw=p?.raw;
-    const d=raw?.d||{};
-    if(d.group===true||d.isGroup===true||d.inGroup===true)return 'W grupie';
-    if(Number(d.groupType)>0)return 'W grupie';
-    // Uzyj tego samego API co oryginalna minimapa; nie wymagaj konkretnej rangi.
-    if(raw && typeof raw.getKind==='function'){
-      try{
-        const tip=window.Engine?.npcs?.getTip?.(raw,{withIcon:false});
-        if(typeof tip==='string' && /w\s+grupie/i.test(tip))return 'W grupie';
-      }catch{}
-    }
-    if(/w\s+grupie/i.test(nativeDescription(p,'monster')))return 'W grupie';
-    return '';
-  }
-  // Margonem: d.grp is the actual group instance identifier.
-  // groupType describes the type of grouping, NOT membership identity.
+  // Grupa istnieje tylko wtedy, gdy silnik udostepnia dodatni identyfikator grp.
+  // grp=0, null, brak pola i wartosci niepoprawne NIE oznaczaja grupy.
+  // groupType i tekst tooltipa nie sa identyfikatorami konkretnej grupy.
   function monsterGroupId(p){
-    const d=p?.raw?.d||{};
-    const value=d.grp??p?.grp??p?.groupId;
-    return value===undefined||value===null||value===''?null:String(value);
+    const d=p?.raw?.d;
+    const value=d && Object.prototype.hasOwnProperty.call(d,'grp')
+      ? d.grp : (p?.grp??p?.groupId);
+    if(value===null||value===undefined||value==='')return null;
+    const id=Number(value);
+    return Number.isSafeInteger(id)&&id>0?String(id):null;
+  }
+  function monsterGroupInfo(p){
+    return monsterGroupId(p)!==null?'W grupie':'';
   }
   function monsterGroupMembers(selected,markers){
-    if(!selected||monsterGroupInfo(selected)!=='W grupie')return [];
     const group=monsterGroupId(selected);
-    // Never infer exact membership from proximity: adjacent groups may overlap.
-    if(group===null)return [selected];
+    if(group===null)return [];
     return markers.filter(p=>monsterGroupId(p)===group);
   }
   function previewInfo(hit){
@@ -750,8 +737,8 @@
       const previous=rememberedMonsters.get(id);
       rememberedMonsters.set(id,{id,x:p.x,y:p.y,name:p.name,lvl:p.lvl,
         monsterClass:p.monsterClass,kind:p.kind,
-        inGroup:monsterGroupInfo(p)==='W grupie'||previous?.inGroup===true,
-        groupId:monsterGroupId(p)??previous?.groupId??null,lastSeen:now});
+        inGroup:monsterGroupId(p)!==null,
+        groupId:monsterGroupId(p),lastSeen:now});
     }
     const ghosts=[];
     for(const [id,p] of rememberedMonsters){
@@ -944,7 +931,7 @@
       const py=(hoverPos.y-rect.top)*canvas.height/rect.height;
       const hits=hoverHits.filter(hit=>hit.type==='monster'&&Math.hypot(hit.x-px,hit.y-py)<=Math.max(6,hit.radius+3));
       const selected=hits[hits.length-1]?.p;
-      if(selected&&monsterGroupInfo(selected)==='W grupie'){
+      if(selected&&monsterGroupId(selected)!==null){
         const members=monsterGroupMembers(selected,[...ghostMonsters,...m.monsters]);
         const ids=new Set(members.map(rememberedMonsterKey));
         for(const hit of hoverHits){
