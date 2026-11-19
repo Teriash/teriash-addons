@@ -1034,7 +1034,7 @@
       <strong>Kolory poszczególnych znaczników</strong><div class="ta-colors">${colorControls}</div>
       <button data-a="resetcolors" type="button">Przywróć domyślne kolory</button>
       <button data-a="save">Zapisz</button> <button data-a="close">Zamknij</button>
-      <p style="color:#9eb6bd;line-height:1.4">Teren jest pobierany bezpośrednio z Engine.map.src. Nie trzeba otwierać podręcznej mapy. Rozpoznawanie elit i rzadkości przedmiotów jest wstępne.</p>`;
+      `;
     menu.querySelector('[data-a="resetcolors"]').onclick=()=>{
       menu.querySelectorAll('[data-color]').forEach(input=>input.value=DEFAULT_COLORS[input.dataset.color]);
     };
